@@ -3,75 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MemePulse: Decentralized Token Analytics</title>
+    <title>MemePulse: Decentralized Token Analytics V4</title>
     <!-- Load Tailwind CSS CDN for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Inter font for professional typography -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <!-- Load Lightweight Charts for professional financial charts -->
-    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <!-- Load Lucide Icons for aesthetic UI elements -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Custom dark theme and scrollbar styling -->
     <style>
         :root {
-            --primary-color: #10b981; /* Emerald */
-            --background-dark: #0a0a0a;
-            --card-dark: #1f2937; /* Gray 800 */
+            --primary-color: #34d399; /* Emerald 400 */
+            --background-dark: #0d0d1a; /* Very dark blue-gray */
+            --card-dark: #1e293b; /* Slate 800 */
         }
         body {
             font-family: 'Inter', sans-serif;
             background-color: var(--background-dark);
-            color: #e5e7eb; /* Light gray text */
+            color: #f3f4f6; /* Light gray text */
         }
-        /* Custom scrollbar for a professional look */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #374151; /* Dark gray for thumb */
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #1f2937; /* Slightly lighter background */
-        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
     </style>
 </head>
 <body class="min-h-screen">
 
-    <header class="bg-gray-900 border-b border-gray-800 py-4 shadow-lg sticky top-0 z-10">
+    <header class="bg-slate-900 border-b border-slate-700 py-4 shadow-xl sticky top-0 z-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-            <h1 class="text-3xl font-extrabold text-white">
-                <span class="text-emerald-400">Meme</span>Pulse
+            <h1 class="text-3xl font-extrabold text-white flex items-center">
+                <i data-lucide="zap" class="w-6 h-6 text-green-400 mr-2"></i>
+                <span class="text-green-400">Meme</span>Pulse
             </h1>
-            <nav class="hidden md:flex space-x-6 text-sm font-medium">
-                <a href="#trending" class="text-gray-400 hover:text-emerald-400 transition">Trending</a>
-                <a href="#oracle" class="text-gray-400 hover:text-emerald-400 transition">The Oracle</a>
-                <a href="#" class="bg-emerald-600 px-3 py-1 rounded-full text-white hover:bg-emerald-500 transition">GitHub Pages</a>
-            </nav>
         </div>
     </header>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         <!-- Section 1: The Oracle - Token Search and Prediction -->
-        <section id="oracle" class="mb-12 bg-gray-900 p-6 rounded-xl shadow-2xl border border-gray-800">
-            <h2 class="text-3xl font-bold mb-6 text-white border-b border-gray-700 pb-3">The Oracle: Real-Time Token Analysis</h2>
-            <p class="text-gray-400 mb-6">Enter a meme coin token address (e.g., on ETH, BSC, Solana) to get live metrics, charts, and an experimental prediction based on recent trading velocity.</p>
+        <section id="oracle" class="mb-12 bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
+            <h2 class="text-3xl font-bold mb-6 text-white border-b border-slate-600 pb-3">The Oracle: Live Token Analysis</h2>
+            <p class="text-slate-300 mb-6">Enter a token address (e.g., ETH, BSC, Solana chain) or a symbol for real-time data and experimental prediction.</p>
 
             <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
                 <input type="text" id="tokenAddressInput" placeholder="Enter Token Address (e.g., 0x...)"
-                       class="flex-1 p-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:ring-emerald-500 focus:border-emerald-500 transition placeholder-gray-500">
+                       class="flex-1 p-3 rounded-xl bg-slate-900 text-white border border-slate-700 focus:ring-green-500 focus:border-green-500 transition placeholder-slate-500">
                 <button id="searchButton" onclick="handleSearch()"
-                        class="px-6 py-3 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-500 transition transform hover:scale-[1.01] active:scale-[0.99]">
-                    Analyze Token
+                        class="px-8 py-3 bg-green-600 text-white font-bold rounded-xl shadow-lg hover:bg-green-500 transition transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center">
+                    <i data-lucide="bar-chart-3" class="w-5 h-5 mr-2"></i>
+                    Analyze
                 </button>
             </div>
 
-            <div id="loadingIndicator" class="hidden mt-4 text-center text-emerald-400">
+            <div id="loadingIndicator" class="hidden mt-4 text-center text-green-400">
                 <svg class="animate-spin h-5 w-5 mr-3 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Fetching live data...
+                Loading Live Data...
             </div>
             <div id="errorMessage" class="hidden mt-4 text-center p-3 rounded-lg bg-red-900/50 text-red-300 border border-red-700"></div>
         </section>
@@ -80,437 +70,483 @@
         <section id="tokenDetails" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
             
             <!-- Prediction Card (The Oracle) -->
-            <div class="lg:col-span-1 bg-gray-900 p-6 rounded-xl shadow-2xl border border-gray-800 flex flex-col justify-between">
+            <div class="lg:col-span-1 bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700 flex flex-col justify-between transition-all duration-300 hover:shadow-green-500/20">
                 <div>
-                    <h3 class="text-2xl font-bold mb-4 text-emerald-400">The Oracle Prediction</h3>
-                    <div class="flex space-x-3 mb-4" id="predictionIntervals">
+                    <h3 class="text-2xl font-bold mb-4 text-green-400 flex items-center">
+                        <i data-lucide="eye" class="w-5 h-5 mr-2"></i>
+                        Oracle Prediction
+                    </h3>
+                    <p class="text-slate-400 text-sm mb-4">The percentage shows the **Probability of Market Cap Growth** for the selected interval.</p>
+
+                    <div class="flex space-x-3 mb-6" id="predictionIntervals">
                         <!-- Prediction Interval Buttons -->
-                        <button onclick="runPrediction('15m')" class="interval-btn px-3 py-1 bg-emerald-700/50 text-sm rounded-full text-white border border-emerald-600 hover:bg-emerald-600 transition" data-interval="15m">15M</button>
-                        <button onclick="runPrediction('1h')" class="interval-btn px-3 py-1 bg-gray-800 text-sm rounded-full text-gray-400 border border-gray-700 hover:bg-emerald-600 transition" data-interval="1h">1H</button>
-                        <button onclick="runPrediction('1d')" class="interval-btn px-3 py-1 bg-gray-800 text-sm rounded-full text-gray-400 border border-gray-700 hover:bg-emerald-600 transition" data-interval="1d">1D</button>
-                        <button onclick="runPrediction('1w')" class="interval-btn px-3 py-1 bg-gray-800 text-sm rounded-full text-gray-400 border border-gray-700 hover:bg-emerald-600 transition" data-interval="1w">1W</button>
+                        <button onclick="runPrediction('15m')" class="interval-btn px-3 py-1 bg-green-700/50 text-sm rounded-full text-white border border-green-600 hover:bg-green-600 transition" data-interval="15m">15M</button>
+                        <button onclick="runPrediction('1h')" class="interval-btn px-3 py-1 bg-slate-700 text-sm rounded-full text-slate-300 border border-slate-600 hover:bg-green-600 transition" data-interval="1h">1H</button>
+                        <button onclick="runPrediction('1d')" class="interval-btn px-3 py-1 bg-slate-700 text-sm rounded-full text-slate-300 border border-slate-600 hover:bg-green-600 transition" data-interval="1d">1D</button>
+                        <button onclick="runPrediction('1w')" class="interval-btn px-3 py-1 bg-slate-700 text-sm rounded-full text-slate-300 border border-slate-600 hover:bg-green-600 transition" data-interval="1w">1W</button>
                     </div>
 
-                    <div id="predictionResult" class="text-center p-6 rounded-xl border-4 border-emerald-700/50 bg-gray-800/50 transition duration-300">
-                        <p class="text-xl font-semibold mb-2 text-gray-400">Select an interval to run the analysis.</p>
-                        <p class="text-xs text-gray-500">Analysis based on recent velocity and volatility.</p>
+                    <div id="predictionResult" class="text-center p-6 rounded-xl border-4 border-green-700/50 bg-slate-900 transition duration-300">
+                        <p class="text-xl font-semibold mb-2 text-slate-400">Select a time interval for analysis.</p>
                     </div>
                 </div>
                 <div class="mt-6">
                     <p class="text-xs text-yellow-500 bg-yellow-900/30 p-2 rounded-lg border border-yellow-700">
-                        <span class="font-bold">Disclaimer:</span> This prediction is highly experimental, based on a simple heuristic model, and should NOT be used for financial advice.
+                        <span class="font-bold">IMPORTANT - NOT FINANCIAL ADVICE:</span> This prediction is experimental, based on a heuristic model, and MUST NOT be used for investment advice!
                     </p>
                 </div>
             </div>
 
-            <!-- Main Token Stats -->
-            <div class="lg:col-span-2 bg-gray-900 p-6 rounded-xl shadow-2xl border border-gray-800">
-                <div id="tokenHeader" class="flex justify-between items-center mb-4 pb-2 border-b border-gray-700">
-                    <h3 class="text-3xl font-extrabold text-white" id="tokenSymbol"></h3>
-                    <p class="text-4xl font-extrabold" id="currentPrice">$0.00000000</p>
+            <!-- Main Token Stats & Extra Data -->
+            <div class="lg:col-span-2 space-y-6">
+                
+                <!-- Price and Key Metrics -->
+                <div class="bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
+                    <div id="tokenHeader" class="flex justify-between items-start mb-4 pb-2 border-b border-slate-600">
+                        <div>
+                            <p class="text-sm text-slate-400">Analyzed Pair</p>
+                            <h3 class="text-4xl font-extrabold text-white" id="tokenSymbol"></h3>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm text-slate-400">Current Price</p>
+                            <p class="text-5xl font-extrabold" id="currentPrice">$0.0000</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-center">
+                        <div class="bg-slate-700/50 p-3 rounded-lg">
+                            <p class="text-xs text-slate-400">Market Cap (Est.)</p>
+                            <p class="text-white font-bold text-lg" id="marketCap">$0</p>
+                        </div>
+                        <div class="bg-slate-700/50 p-3 rounded-lg">
+                            <p class="text-xs text-slate-400">24H Vol.</p>
+                            <p class="text-white font-bold text-lg" id="volume24h">$0</p>
+                        </div>
+                        <div class="bg-slate-700/50 p-3 rounded-lg">
+                            <p class="text-xs text-slate-400">24H Change</p>
+                            <p class="font-bold text-lg" id="priceChange24h">0.00%</p>
+                        </div>
+                        <div class="bg-slate-700/50 p-3 rounded-lg">
+                            <p class="text-xs text-slate-400">Liquidity (USD)</p>
+                            <p class="text-white font-bold text-lg" id="liquidity">$0</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-500">Chain: <span id="tokenChain" class="font-medium text-slate-300"></span> | Address: <span id="tokenBaseAddress" class="font-mono text-xs text-slate-400"></span></p>
                 </div>
 
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-center">
-                    <div class="bg-gray-800 p-3 rounded-lg">
-                        <p class="text-xs text-gray-400">Market Cap</p>
-                        <p class="text-white font-bold" id="marketCap">$0</p>
-                    </div>
-                    <div class="bg-gray-800 p-3 rounded-lg">
-                        <p class="text-xs text-gray-400">24H Volume</p>
-                        <p class="text-white font-bold" id="volume24h">$0</p>
-                    </div>
-                    <div class="bg-gray-800 p-3 rounded-lg">
-                        <p class="text-xs text-gray-400">24H Change</p>
-                        <p class="font-bold" id="priceChange24h">0.00%</p>
-                    </div>
-                    <div class="bg-gray-800 p-3 rounded-lg">
-                        <p class="text-xs text-gray-400">Liquidity</p>
-                        <p class="text-white font-bold" id="liquidity">$0</p>
+                <!-- Transaction & Tax Data -->
+                <div class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+                    <h4 class="text-xl font-bold mb-4 text-white flex items-center border-b border-slate-700 pb-2">
+                        <i data-lucide="scale" class="w-4 h-4 mr-2 text-indigo-400"></i>
+                        Transaction and Tax Metrics
+                    </h4>
+                    <div class="grid grid-cols-2 gap-4 text-center">
+                        <div class="bg-slate-700 p-3 rounded-lg">
+                            <p class="text-xs text-slate-400">24H Total Transactions</p>
+                            <p class="text-indigo-300 font-bold text-xl" id="txns24h">N/A</p>
+                        </div>
+                        <div class="bg-slate-700 p-3 rounded-lg">
+                            <p class="text-xs text-slate-400">5M Flippers (B/S)</p>
+                            <p class="text-indigo-300 font-bold text-xl" id="flippers5m">N/A</p>
+                        </div>
+                        <div class="bg-slate-700 p-3 rounded-lg">
+                            <p class="text-xs text-slate-400">Buy Tax</p>
+                            <p class="text-orange-400 font-bold text-xl" id="buyTax">N/A</p>
+                        </div>
+                        <div class="bg-slate-700 p-3 rounded-lg">
+                            <p class="text-xs text-slate-400">Sell Tax</p>
+                            <p class="text-orange-400 font-bold text-xl" id="sellTax">N/A</p>
+                        </div>
                     </div>
                 </div>
-                
-                <p class="text-sm text-gray-500 mb-4">Chain: <span id="tokenChain" class="font-medium text-gray-400"></span></p>
             </div>
 
-            <!-- Chart Container -->
-            <div class="lg:col-span-3 bg-gray-900 p-6 rounded-xl shadow-2xl border border-gray-800">
-                <h3 class="text-xl font-bold mb-4 text-white">Price Chart (6H)</h3>
-                <div id="chartContainer" class="h-[400px] w-full"></div>
+
+            <!-- Live Chart Container (TradingView Widget) -->
+            <div class="lg:col-span-3 bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700 mt-6">
+                <h3 class="text-xl font-bold mb-4 text-white flex items-center">
+                    <i data-lucide="trending-up" class="w-5 h-5 mr-2 text-green-400"></i>
+                    Live Price Chart (TradingView)
+                </h3>
+                <div id="chartContainer" class="h-[500px] w-full bg-slate-900 rounded-xl overflow-hidden">
+                    <p class="p-6 text-center text-slate-500">Please search for a token to load the chart.</p>
+                </div>
             </div>
 
         </section>
 
-        <!-- Section 2: Trending Meme Coins -->
-        <section id="trending" class="pt-8 mt-12 border-t border-gray-800">
-            <h2 class="text-3xl font-bold mb-6 text-white">Trending High-Cap Meme Tokens</h2>
-            <div id="trendingCoins" class="bg-gray-900 p-4 rounded-xl shadow-xl overflow-x-auto border border-gray-800">
-                <table class="min-w-full divide-y divide-gray-700">
-                    <thead>
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">#</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Token / Pair</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Price</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">24H Vol</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">24H Change</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Chain</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="trendingTableBody" class="divide-y divide-gray-800">
-                        <tr><td colspan="7" class="text-center py-4 text-gray-500">Loading top trending pairs...</td></tr>
-                    </tbody>
-                </table>
+        <!-- Section 2: Token Safety and Contract Risk Assessment -->
+        <section id="safetyCheck" class="hidden pt-8 mt-12 border-t border-slate-700">
+            <h2 class="text-3xl font-bold mb-6 text-white flex items-center">
+                <i data-lucide="shield-alert" class="w-6 h-6 mr-2 text-yellow-400"></i>
+                Token Safety and Risk Assessment
+            </h2>
+            <div id="safetyResult" class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+                <p class="text-slate-400">Run an analysis first to view the contract risk assessment based on known metrics like taxes and liquidity.</p>
             </div>
-            
         </section>
 
     </main>
 
-    <footer class="mt-12 py-6 border-t border-gray-800 text-center text-gray-500 text-sm">
-        &copy; 2025 MemePulse Analytics. Data provided by DexScreener. Hosted on GitHub Pages.
+    <footer class="mt-12 py-6 border-t border-slate-800 text-center text-slate-500 text-sm">
+        <script>lucide.createIcons();</script>
+        &copy; 2025 MemePulse Analytics. Data source: DexScreener and TradingView.
     </footer>
 
     <script>
         const DEXSCREENER_BASE_URL = 'https://api.dexscreener.com/latest/dex/';
-        let chart = null; // Lightweight Chart instance
-
+        
         /**
-         * Utility function to format numbers as currency.
+         * Helper function: Formats numbers as currency (USD).
          * @param {number} value 
          * @returns {string} Formatted currency string.
          */
         function formatCurrency(value) {
-            if (value === undefined || value === null) return 'N/A';
+            if (value === undefined || value === null || isNaN(value)) return 'N/A';
             return new Intl.NumberFormat('en-US', {
                 style: 'currency',
                 currency: 'USD',
                 notation: 'compact',
                 compactDisplay: 'short',
-                maximumSignificantDigits: 4,
+                maximumSignificantDigits: 6, // Show more precision for low-priced coins
             }).format(value);
         }
 
         /**
-         * Utility function to display messages to the user.
+         * Helper function: Formats large numbers (e.g., for transactions).
+         * @param {number} value 
+         * @returns {string} Formatted number string.
+         */
+        function formatNumber(value) {
+            if (value === undefined || value === null || isNaN(value)) return 'N/A';
+             return new Intl.NumberFormat('en-US', {
+                maximumFractionDigits: 0
+            }).format(value);
+        }
+
+        /**
+         * Helper function: Displays messages to the user.
          * @param {string} message 
          * @param {boolean} isError 
          */
         function displayMessage(message, isError = false) {
             const errorDiv = document.getElementById('errorMessage');
-            errorDiv.textContent = message;
+            errorDiv.innerHTML = message;
             errorDiv.className = isError 
                 ? 'mt-4 text-center p-3 rounded-lg bg-red-900/50 text-red-300 border border-red-700'
-                : 'mt-4 text-center p-3 rounded-lg bg-emerald-900/50 text-emerald-300 border border-emerald-700';
+                : 'mt-4 text-center p-3 rounded-lg bg-green-900/50 text-green-300 border border-green-700';
             errorDiv.classList.remove('hidden');
-            setTimeout(() => errorDiv.classList.add('hidden'), 7000); // Extended timeout for visibility
+            setTimeout(() => errorDiv.classList.add('hidden'), 7000);
         }
 
-        /**
-         * Fetches and displays the top trending pairs.
-         */
-        async function fetchTrendingCoins() {
-            const trendingTableBody = document.getElementById('trendingTableBody');
-            trendingTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-500">Loading top trending pairs...</td></tr>';
-            
-            console.log("DEBUG: Attempting to fetch trending coins from DexScreener...");
-
-            try {
-                // Correct API endpoint for trending tokens
-                const endpoint = DEXSCREENER_BASE_URL + 'tokens/trending';
-                console.log("DEBUG: Fetch URL (TRENDING, FIXED):", endpoint);
-
-                const response = await fetch(endpoint);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error(`DEBUG: HTTP Status ${response.status} received. Response body start: ${errorText.substring(0, 100)}...`);
-                    throw new Error(`HTTP hiba! Státusz: ${response.status}.`);
-                }
-
-                const data = await response.json();
-                console.log("DEBUG: Trending data received successfully.", data);
-
-                // Handle case where API returns success but no pairs are trending (pairs: null)
-                if (!data.pairs || data.pairs.length === 0) {
-                    trendingTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-yellow-500">Nincs jelenleg trendelő adat a DexScreener szerint. Próbálja meg manuálisan beírni egy token címét.</td></tr>';
-                    return;
-                }
-
-                trendingTableBody.innerHTML = '';
-                
-                // Sort by liquidity to prioritize high-cap, stable pairs
-                const topPairs = data.pairs
-                    .filter(p => p.liquidity && p.liquidity.usd > 100000) // Filter for decent liquidity
-                    .slice(0, 10); // Take top 10
-
-                topPairs.forEach((pair, index) => {
-                    const priceChange = pair.priceChange.h24;
-                    const changeColor = priceChange >= 0 ? 'text-green-400' : 'text-red-400';
-                    const tokenAddress = pair.baseToken.address;
-
-                    const row = `
-                        <tr class="hover:bg-gray-800 transition">
-                            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500">${index + 1}</td>
-                            <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-white">${pair.baseToken.symbol} / ${pair.quoteToken.symbol}</td>
-                            <td class="px-6 py-3 whitespace-nowrap text-sm text-right font-medium text-white">${formatCurrency(pair.priceUsd)}</td>
-                            <td class="px-6 py-3 whitespace-nowrap text-sm text-right text-gray-400">${formatCurrency(pair.volume.h24)}</td>
-                            <td class="px-6 py-3 whitespace-nowrap text-sm text-right ${changeColor}">${priceChange.toFixed(2)}%</td>
-                            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500">${pair.chainId.toUpperCase()}</td>
-                            <td class="px-6 py-3 whitespace-nowrap text-sm">
-                                <button onclick="autoSearch('${tokenAddress}')" class="text-emerald-400 hover:text-emerald-300 font-semibold text-xs py-1 px-2 rounded-full border border-emerald-500/50 transition">Analyze</button>
-                            </td>
-                        </tr>
-                    `;
-                    trendingTableBody.innerHTML += row;
-                });
-
-            } catch (error) {
-                console.error('API Error: Failed to fetch trending coins:', error);
-                trendingTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-red-400">Hiba az adatok betöltésekor. Kérjük, ellenőrizze a konzolt (F12) a hálózati hibákért.</td></tr>';
-                displayMessage(`Hiba: Nem sikerült betölteni a trendeket. Lásd a konzolt: ${error.message}`, true);
-            }
-        }
+        // --- Removed fetchTrendingCoins and autoSearch functions ---
 
         /**
-         * Utility to allow clicking "Analyze" from the trending list.
-         * @param {string} address 
-         */
-        function autoSearch(address) {
-            document.getElementById('tokenAddressInput').value = address;
-            handleSearch();
-        }
-
-
-        /**
-         * Main search handler to fetch token data.
+         * Main search handler. Fetches token data.
          */
         async function handleSearch() {
             let address = document.getElementById('tokenAddressInput').value.trim();
             const loadingIndicator = document.getElementById('loadingIndicator');
             
-            // VALIDATION: Prevent API call with obviously invalid/pasted console content
-            if (!address || address.length < 5 || address.length > 100 || address.includes('\n') || address.includes('DEBUG')) {
-                displayMessage("Kérjük, adjon meg egy érvényes token címet (pl. 0x...) vagy szimbólumot (pl. PEPE). Kerülje a hosszú debug logok beillesztését.", true);
+            if (!address) {
+                displayMessage("Please enter a token address or symbol.", true);
                 return;
             }
 
+            // UI update
             loadingIndicator.classList.remove('hidden');
             document.getElementById('tokenDetails').classList.add('hidden');
+            document.getElementById('safetyCheck').classList.add('hidden');
             document.getElementById('errorMessage').classList.add('hidden');
             
-            console.log(`DEBUG: Searching for token address/symbol: ${address}`);
-
             try {
+                // Endpoint: /latest/dex/tokens/{address} (token-based search)
                 const endpoint = `${DEXSCREENER_BASE_URL}tokens/${address}`;
-                console.log("DEBUG: Search Fetch URL:", endpoint);
                 
                 const response = await fetch(endpoint);
                 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP hiba! Státusz: ${response.status}.`);
+                    throw new Error(`HTTP Error! Status: ${response.status}.`);
                 }
 
                 const data = await response.json();
 
                 if (!data.pairs || data.pairs.length === 0) {
-                    throw new Error("Token not found or no trading pairs available on major DEXes.");
+                    throw new Error("Token not found or no available trading pairs.");
                 }
 
-                // Get the best/most liquid pair (usually the first one)
+                // Select the pair with the highest liquidity
                 const pair = data.pairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
                 
                 if (!pair) {
-                    throw new Error("Could not retrieve pair data.");
+                    throw new Error("Failed to retrieve pair data.");
                 }
 
                 renderTokenDetails(pair);
-                await fetchHistoricalData(pair.pairAddress, pair.chainId);
+                renderTradingViewChart(pair);
+                runSafetyCheck(pair); // Run the new safety check
 
                 document.getElementById('tokenDetails').classList.remove('hidden');
                 
-                // Clear prediction result area after new search
-                const predictionResult = document.getElementById('predictionResult');
-                predictionResult.innerHTML = '<p class="text-xl font-semibold mb-2 text-gray-400">Select an interval to run the analysis.</p><p class="text-xs text-gray-500">Analysis based on recent velocity and volatility.</p>';
-                document.querySelectorAll('.interval-btn').forEach(btn => {
-                    btn.classList.remove('bg-emerald-700/50', 'border-emerald-600', 'text-white');
-                    btn.classList.add('bg-gray-800', 'border-gray-700', 'text-gray-400');
-                });
-                
-                // Reset to 15m prediction after successful search
+                // Reset prediction area and run default 15m prediction
                 document.querySelector('.interval-btn[data-interval="15m"]').click();
 
 
             } catch (error) {
                 console.error('API Error: Search failed:', error);
-                displayMessage(`Analysis failed: ${error.message}. Please check the token address/symbol.`, true);
+                displayMessage(`Analysis failed: ${error.message}. Please check the address/symbol.`, true);
             } finally {
                 loadingIndicator.classList.add('hidden');
+                lucide.createIcons();
             }
         }
 
         /**
-         * Renders the basic token statistics.
+         * Displays core and supplementary token statistics.
          * @param {object} pair 
          */
         function renderTokenDetails(pair) {
             const price = pair.priceUsd ? parseFloat(pair.priceUsd) : 0;
-            const priceChange24h = pair.priceChange.h24;
-            // Use FDV or simple liquidity multiplier as placeholder
+            const priceChange24h = pair.priceChange?.h24 || 0;
+            // Market Cap Estimate: use FDV if available, otherwise Liquidity * 5 (raw estimate)
             const marketCap = pair.fdv || (pair.liquidity?.usd ? pair.liquidity.usd * 5 : 0); 
             
+            // Core Data
             document.getElementById('tokenSymbol').textContent = `${pair.baseToken.symbol}/${pair.quoteToken.symbol}`;
             document.getElementById('currentPrice').textContent = formatCurrency(price);
             document.getElementById('marketCap').textContent = formatCurrency(marketCap);
-            document.getElementById('volume24h').textContent = formatCurrency(pair.volume.h24);
-            document.getElementById('liquidity').textContent = formatCurrency(pair.liquidity.usd);
+            document.getElementById('volume24h').textContent = formatCurrency(pair.volume?.h24);
+            document.getElementById('liquidity').textContent = formatCurrency(pair.liquidity?.usd);
             document.getElementById('tokenChain').textContent = pair.chainId.toUpperCase();
+            document.getElementById('tokenBaseAddress').textContent = pair.baseToken.address;
             
             const priceChangeElement = document.getElementById('priceChange24h');
             priceChangeElement.textContent = `${priceChange24h.toFixed(2)}%`;
-            priceChangeElement.className = priceChange24h >= 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold';
-        }
+            priceChangeElement.className = priceChange24h >= 0 ? 'text-green-400 font-bold text-lg' : 'text-red-400 font-bold text-lg';
 
+            // Transaction Data
+            document.getElementById('txns24h').textContent = formatNumber(pair.txns?.h24?.buys + pair.txns?.h24?.sells) || 'N/A';
+            document.getElementById('flippers5m').textContent = `${formatNumber(pair.txns?.m5?.buys || 0)} B / ${formatNumber(pair.txns?.m5?.sells || 0)} S`;
+            document.getElementById('buyTax').textContent = `${pair.pairContract?.buyTax?.toFixed(2) || '0.00'}%`;
+            document.getElementById('sellTax').textContent = `${pair.pairContract?.sellTax?.toFixed(2) || '0.00'}%`;
+        }
 
         /**
-         * Fetches and renders historical price data for the chart. (Uses simulated data as DexScreener lacks public historical endpoint.)
+         * Loads the TradingView Widget based on DexScreener pair data.
+         * @param {object} pair 
          */
-        async function fetchHistoricalData(pairAddress, chainId) {
+        function renderTradingViewChart(pair) {
             const chartContainer = document.getElementById('chartContainer');
-            chartContainer.innerHTML = ''; // Clear previous chart
+            chartContainer.innerHTML = ''; // Clear previous content
 
-            // Initialize Lightweight Chart
-            if (chart) {
-                chart.remove();
-            }
-
-            chart = LightweightCharts.createChart(chartContainer, {
-                width: chartContainer.clientWidth,
-                height: 400,
-                layout: {
-                    backgroundColor: '#1f2937',
-                    textColor: '#d1d5db',
-                },
-                grid: {
-                    vertLines: { color: '#374151' },
-                    horzLines: { color: '#374151' },
-                },
-                rightPriceScale: {
-                    borderColor: '#4b5563',
-                },
-                timeScale: {
-                    borderColor: '#4b5563',
-                    timeVisible: true,
-                    secondsVisible: false,
-                },
+            // Construct TradingView symbol (e.g., PEPEUSDT)
+            const quoteSymbol = pair.quoteToken.symbol === 'WETH' ? 'ETH' : pair.quoteToken.symbol;
+            let tradingSymbol = `${pair.baseToken.symbol}${quoteSymbol}`;
+            
+            // TradingView widget integration
+            const script = document.createElement('script');
+            script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+            script.async = true;
+            script.innerHTML = JSON.stringify({
+                "width": "100%",
+                "height": "100%",
+                "symbol": tradingSymbol, // e.g., 'PEPEUSDT'
+                "interval": "60", // 1-hour candles
+                "timezone": "Europe/Budapest",
+                "theme": "dark",
+                "style": "1",
+                "locale": "en", // English interface
+                "allow_symbol_change": true,
+                "save_image": false,
+                "container_id": "chartContainer",
+                "calendar": false,
+                "support_host": "https://www.tradingview.com"
             });
-            
-            // Validation for chart instance methods to prevent TypeError
-            if (!chart || typeof chart.addLineSeries !== 'function') {
-                console.error('Lightweight Charts Error: Chart object creation failed or addLineSeries is missing.');
-                displayMessage('Chart rendering failed: The charting library component is missing a required function. Check console for details.', true);
-                return;
-            }
+            chartContainer.appendChild(script);
 
-            const lineSeries = chart.addLineSeries({
-                color: '#10b981', // Emerald
-                lineWidth: 2,
-            });
-            
-            // --- SIMULATED DATA GENERATION ---
-            const now = Math.floor(Date.now() / 1000);
-            const dataPoints = [];
-            // Safely parse current price
-            const currentPriceText = document.getElementById('currentPrice').textContent;
-            const currentPrice = parseFloat(currentPriceText.replace(/[^0-9.-]+/g,"")) || 0.000001; 
-            let price = currentPrice * (1 + (Math.random() - 0.5) * 0.05); 
-
-            for (let i = 59; i >= 0; i--) { // 60 data points (simulating 6 hours, 6-minute intervals)
-                const timestamp = now - (i * 6 * 60); // 6 minutes ago
-                price = price * (1 + (Math.random() - 0.5) * 0.02); 
-                dataPoints.push({ time: timestamp, value: price });
-            }
-            
-            lineSeries.setData(dataPoints);
-            // --- END SIMULATED DATA GENERATION ---
-
-            // Resize observer for responsiveness (important for single-file design)
-            new ResizeObserver(entries => {
-                const entry = entries[0];
-                if (entry && entry.target.id === 'chartContainer') {
-                    chart.applyOptions({ width: entry.contentRect.width });
+             // Add a warning if the chart doesn't load
+             setTimeout(() => {
+                if (chartContainer.querySelector('iframe')) {
+                    console.log("DEBUG: TradingView chart loaded.");
+                } else {
+                    chartContainer.innerHTML = `<p class="p-6 text-center text-red-400">WARNING: TradingView could not find the pair ${tradingSymbol}. It may be a too new/low-cap token. Please try a different token symbol or address!</p>`;
                 }
-            }).observe(chartContainer);
+            }, 3000);
         }
+
         
         /**
-         * Heuristic Model: Calculates an "experimental prediction" based on simulated recent
-         * volume and price volatility.
+         * Runs the experimental prediction (Heuristic Model).
          * @param {string} interval 
          */
         function runPrediction(interval) {
-            // Update active button style
+            // Update button styles
             document.querySelectorAll('.interval-btn').forEach(btn => {
-                btn.classList.remove('bg-emerald-700/50', 'border-emerald-600', 'text-white');
-                btn.classList.add('bg-gray-800', 'border-gray-700', 'text-gray-400');
+                btn.classList.remove('bg-green-700/50', 'border-green-600', 'text-white');
+                btn.classList.add('bg-slate-700', 'border-slate-600', 'text-slate-300');
             });
             const activeBtn = document.querySelector(`.interval-btn[data-interval="${interval}"]`);
-            activeBtn.classList.add('bg-emerald-700/50', 'border-emerald-600', 'text-white');
-            activeBtn.classList.remove('bg-gray-800', 'border-gray-700', 'text-gray-400');
+            activeBtn.classList.add('bg-green-700/50', 'border-green-600', 'text-white');
+            activeBtn.classList.remove('bg-slate-700', 'border-slate-600', 'text-slate-300');
 
-
+            // Retrieve displayed data
             const predictionResult = document.getElementById('predictionResult');
-            const priceChange24h = parseFloat(document.getElementById('priceChange24h').textContent.replace('%', ''));
+            const priceChange24h = parseFloat(document.getElementById('priceChange24h').textContent.replace('%', '')) || 0;
+            const txns24hText = document.getElementById('txns24h').textContent.replace(/[^0-9.-]+/g,"");
+            const txns24h = parseFloat(txns24hText) || 0;
+            const volume24hText = document.getElementById('volume24h').textContent.replace(/[^0-9.-]+/g,"");
+            const volume24h = parseFloat(volume24hText) || 0;
 
-            // Simulation of recent velocity/volatility data based on the last 24h trend
-            const velocityScore = Math.random() * 10; 
-            let probability = 50 + (priceChange24h / 5); 
 
-            if (velocityScore > 7) {
-                probability += 10; 
-            } else if (velocityScore < 3) {
-                probability -= 10; 
-            }
+            // Calculate experimental probability
+            // Base: 24h change and transaction activity
+            let baseProbability = 50 + (priceChange24h / 5); 
+            
+            // Interval adjustment
+            let intervalMultiplier = 1;
+            if (interval === '15m') intervalMultiplier = 1.2;
+            else if (interval === '1h') intervalMultiplier = 1.1;
+            else if (interval === '1d') intervalMultiplier = 0.9;
+            else if (interval === '1w') intervalMultiplier = 0.8;
 
-            if (interval === '15m' || interval === '1h') {
-                probability += (Math.random() * 10 - 5); 
-            } else if (interval === '1w') {
-                probability -= 5; 
-            }
+            // Add velocity factor (based on Transaction/Volume ratio)
+            const velocity = (txns24h > 1000 && volume24h > 100000) ? (txns24h / volume24h) * 1000 : 0;
+            baseProbability += Math.min(10, velocity * 0.1);
 
+            let probability = baseProbability * intervalMultiplier;
+
+            // Clamp probability between 10% and 90%
             probability = Math.max(10, Math.min(90, probability));
+            const fallProbability = 100 - probability;
             
             let message = '';
             let colorClass = '';
+            let recommendation = '';
 
-            if (probability >= 65) {
-                message = `High chance of market cap **rise** (${probability.toFixed(0)}%)`;
+            if (probability >= 75) {
+                // Strong bullish signal
+                message = `High Probability for **Market Cap Growth**!`;
                 colorClass = 'border-green-500 bg-green-900/50';
-            } else if (probability <= 45) {
-                message = `Market cap **dip expected** (${(100 - probability).toFixed(0)}% chance of fall)`;
+                recommendation = `<p class="text-xl font-bold text-green-300 mt-4 border-t border-green-700 pt-3 flex items-center justify-center"><i data-lucide="check-check" class="w-5 h-5 mr-2"></i> RECOMMENDED BUY</p>`;
+            } else if (probability >= 60) {
+                // Moderate bullish signal
+                message = `Moderate chance for **Market Cap Growth**.`;
+                colorClass = 'border-lime-500 bg-lime-900/50';
+            } else if (probability <= 40) {
+                // Bearish signal
+                message = `**Market Cap Decline** is likely!`;
                 colorClass = 'border-red-500 bg-red-900/50';
             } else {
-                message = `**Consolidation / High Volatility** expected (${probability.toFixed(0)}% chance of rise)`;
+                // Consolidation
+                message = `**Consolidation / High Volatility** expected.`;
                 colorClass = 'border-yellow-500 bg-yellow-900/50';
             }
 
             const formattedMessage = `
-                <p class="text-5xl font-extrabold mb-3 text-white">${probability.toFixed(0)}%</p>
-                <p class="text-lg font-semibold text-gray-200">${message}</p>
-                <p class="text-sm text-gray-400 mt-2">Prediction for the next ${interval.toUpperCase()} period.</p>
+                <div class="flex justify-around items-center space-x-4 mb-3">
+                    <div class="text-center">
+                        <p class="text-xs text-slate-400">Growth Probability</p>
+                        <p class="text-5xl font-extrabold text-green-300">${probability.toFixed(0)}%</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-slate-400">Fall Probability</p>
+                        <p class="text-3xl font-extrabold text-red-300">${fallProbability.toFixed(0)}%</p>
+                    </div>
+                </div>
+                <p class="text-lg font-semibold text-white">${message}</p>
+                <p class="text-sm text-slate-400 mt-2">Prediction for the next ${interval.toUpperCase()} interval.</p>
+                ${recommendation}
             `;
 
             predictionResult.innerHTML = formattedMessage;
             predictionResult.className = `text-center p-6 rounded-xl border-4 ${colorClass} transition duration-300`;
+            lucide.createIcons(); // Re-render icons after updating prediction
+        }
+
+        /**
+         * Runs a heuristic safety check based on tax and liquidity metrics.
+         * @param {object} pair 
+         */
+        function runSafetyCheck(pair) {
+            const safetyResult = document.getElementById('safetyResult');
+            const safetyCheckSection = document.getElementById('safetyCheck');
+            safetyCheckSection.classList.remove('hidden');
+
+            const buyTax = pair.pairContract?.buyTax || 0;
+            const sellTax = pair.pairContract?.sellTax || 0;
+            const liquidity = pair.liquidity?.usd || 0;
+
+            let score = 100; // Start with 100 (safest)
+            let riskLevel = 'Low';
+            let warnings = [];
+
+            // 1. High Tax Risk
+            const combinedTax = buyTax + sellTax;
+            if (combinedTax > 10) {
+                score -= 30;
+                warnings.push(`High combined tax (${combinedTax.toFixed(2)}%) suggests a higher risk of manipulative practices or exit fees.`);
+            } else if (combinedTax > 5) {
+                score -= 15;
+                warnings.push(`Moderate combined tax (${combinedTax.toFixed(2)}%) is noted. Be aware of fees.`);
+            }
+
+            // 2. Liquidity Risk
+            if (liquidity < 50000) {
+                score -= 40;
+                warnings.push(`Extremely low liquidity (${formatCurrency(liquidity)}) increases the risk of large price swings and potential 'rug pulls'.`);
+            } else if (liquidity < 200000) {
+                score -= 15;
+                warnings.push(`Liquidity is low (${formatCurrency(liquidity)}). Slippage may be high for large trades.`);
+            }
+
+            // Determine final risk level
+            score = Math.max(0, score); 
+
+            let riskColorClass = '';
+            if (score <= 40) {
+                riskLevel = 'High';
+                riskColorClass = 'text-red-400 bg-red-900/50 border-red-700';
+            } else if (score <= 75) {
+                riskLevel = 'Moderate';
+                riskColorClass = 'text-yellow-400 bg-yellow-900/50 border-yellow-700';
+            } else {
+                riskLevel = 'Low';
+                riskColorClass = 'text-green-400 bg-green-900/50 border-green-700';
+            }
+
+            const warningsList = warnings.length > 0 
+                ? `<ul class="list-disc list-inside mt-4 space-y-2 text-sm text-slate-300">
+                    ${warnings.map(w => `<li class="flex items-start"><i data-lucide="alert-triangle" class="w-4 h-4 mr-2 text-yellow-500 flex-shrink-0 mt-1"></i> ${w}</li>`).join('')}
+                  </ul>`
+                : `<p class="text-green-400 flex items-center"><i data-lucide="check-circle" class="w-5 h-5 mr-2"></i> Initial checks show reasonable contract metrics (low taxes, adequate liquidity).</p>`;
+            
+            const htmlContent = `
+                <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                    <p class="text-xl font-bold">Safety Score (Heuristic)</p>
+                    <p class="text-4xl font-extrabold ${riskColorClass.split(' ')[0]}">${score.toFixed(0)}/100</p>
+                </div>
+                <div class="p-4 rounded-lg border ${riskColorClass.split(' ').slice(2).join(' ')}">
+                    <p class="text-lg font-bold flex items-center ${riskColorClass.split(' ')[0]}">
+                        <i data-lucide="shield-alert" class="w-5 h-5 mr-2"></i> Contract Risk Level: <span class="ml-2">${riskLevel}</span>
+                    </p>
+                    ${warningsList}
+                </div>
+                <p class="text-xs text-slate-500 mt-4">Note: This is an automated assessment and does not check for ownership renouncement, minting, or external code vulnerabilities.</p>
+            `;
+
+            safetyResult.innerHTML = htmlContent;
+            lucide.createIcons();
         }
 
         /**
          * Initialization on page load.
          */
         window.onload = function() {
-            // Set initial placeholder for prediction button
+            // Set default style for the 15m prediction button
             document.querySelector('.interval-btn[data-interval="15m"]').click();
-            fetchTrendingCoins();
+            lucide.createIcons(); // Ensure initial icons are rendered
+            
+            // Note: fetchTrendingCoins has been removed.
         };
 
     </script>
