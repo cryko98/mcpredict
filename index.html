@@ -3,232 +3,441 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MemePulse: Decentralized Token Analytics V5</title>
+    <title>MemePulse: Decentralized Token Analytics</title>
     <!-- Load Tailwind CSS CDN for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Inter font for professional typography -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Load Inter Font for sleek, modern typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
     <!-- Load Lucide Icons for aesthetic UI elements -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Custom dark theme and scrollbar styling -->
+
+    <!-- Firebase SDK Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, orderBy, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Log levels for debugging
+        setLogLevel('debug');
+
+        // Global variables MUST be initialized from the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db = null;
+        let auth = null;
+        let userId = null;
+
+        // Export initialization function for use in the main script
+        window.initializeFirebase = async function() {
+            if (Object.keys(firebaseConfig).length === 0) {
+                 console.error("Firebase config is missing. History feature will be disabled.");
+                 return;
+            }
+            
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                window.db = db; // Make firestore available globally
+                window.auth = auth; // Make auth available globally
+
+                // Authentication
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        window.userId = userId; // Make userId available globally
+                        document.getElementById('userIdDisplay').textContent = userId;
+                        window.loadHistory(); // Load history once authenticated
+                    } else {
+                        // Use a random ID for anonymous users if not signed in
+                        userId = crypto.randomUUID();
+                        window.userId = userId;
+                        document.getElementById('userIdDisplay').textContent = userId;
+                    }
+                });
+
+            } catch (e) {
+                console.error("Firebase Initialization Error:", e);
+                // Display error message to user, e.g., History not available
+                document.getElementById('historyList').innerHTML = `<p class="text-red-400">Error initializing history. Check console for details.</p>`;
+            }
+        }
+    </script>
+
+    <!-- Custom 'High-Tech' Dark Theme Styling -->
     <style>
         :root {
-            --primary-color: #34d399; /* Emerald 400 */
-            --background-dark: #0d0d1a; /* Very dark blue-gray */
-            --card-dark: #1e293b; /* Slate 800 */
+            /* Sleek High-Tech Colors */
+            --primary-accent: #00FFFF; /* Aqua/Cyan for focus */
+            --secondary-accent: #FF8000; /* Bright Orange for alerts/buttons */
+            --background-dark: #0A192F; /* Deep Navy Blue / Dark Slate */
+            --card-dark: #172A46; /* Slightly Lighter Card Background */
+            --border-color: #385E8B;
         }
         body {
             font-family: 'Inter', sans-serif;
             background-color: var(--background-dark);
-            color: #f3f4f6; /* Light gray text */
+            color: #E2E8F0; /* Light text */
+            transition: background-color 0.3s;
         }
-        /* Custom scrollbar */
+        /* Custom scrollbar matching the theme */
         ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: var(--primary-accent); border-radius: 10px; }
+        ::-webkit-scrollbar-track { background: var(--background-dark); }
+        /* Style for the DexScreener chart embed */
+        #chartContainer iframe {
+            min-height: 500px;
+        }
+        /* Style for the sleek CA box */
+        #caContainer {
+            border: 1px solid var(--border-color);
+            background-color: var(--card-dark);
+            box-shadow: 0 0 5px rgba(0, 255, 255, 0.4);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        #caContainer:hover {
+            box-shadow: 0 0 10px var(--primary-accent);
+            border-color: var(--primary-accent);
+            transform: translateY(-1px);
+        }
+        /* Style for the detailed analysis boxes */
+        .analysis-detail {
+            background-color: #0d2036; /* Darker blue shade */
+            border: 1px solid #2a405a;
+            transition: all 0.3s;
+        }
+        .analysis-detail:hover {
+            background-color: #0a192f;
+            border-color: var(--primary-accent);
+            box-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
+        }
+        /* Style for the prediction interval buttons to ensure only one is active at a time */
+        .interval-btn.active {
+            background-color: #1D4ED8 !important; /* blue-700 */
+            border-color: #60A5FA !important; /* blue-400 */
+            color: white !important;
+        }
     </style>
 </head>
 <body class="min-h-screen">
 
-    <header class="bg-slate-900 border-b border-slate-700 py-4 shadow-xl sticky top-0 z-20">
+    <header class="bg-[#05111E] border-b border-gray-700 py-4 shadow-xl sticky top-0 z-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-            <h1 class="text-3xl font-extrabold text-white flex items-center">
-                <i data-lucide="zap" class="w-6 h-6 text-green-400 mr-2"></i>
-                <span class="text-green-400">Meme</span>Pulse
+            
+            <!-- Logo (Sleek High-Tech Vibe) -->
+            <h1 class="text-3xl font-extrabold text-white flex items-center tracking-wider">
+                <i data-lucide="activity-square" class="w-7 h-7 text-[var(--primary-accent)] mr-3"></i>
+                <span style="color:#ffffff;">Meme</span><span style="color:var(--primary-accent);">Pulse</span>
+                <span class="text-xs ml-3 bg-blue-600 px-2 py-0.5 rounded-full font-medium text-white">BETA</span>
             </h1>
+
+            <!-- User ID Display -->
+            <div class="text-right text-xs text-gray-400">
+                USER ID: <span id="userIdDisplay" class="font-mono text-[var(--secondary-accent)]">Loading...</span>
+            </div>
+            
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- INTRODUCTION SECTION -->
+    <section id="introduction" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="bg-[var(--card-dark)] p-6 rounded-xl shadow-lg border border-[var(--border-color)]">
+            <h2 class="text-2xl font-bold mb-3 text-[var(--primary-accent)] flex items-center">
+                <i data-lucide="gauge" class="w-6 h-6 mr-3 text-[var(--secondary-accent)]"></i>
+                WHAT IS MEMEPULSE? (TOKEN ANALYSIS)
+            </h2>
+            <p class="text-gray-300 leading-relaxed font-medium">
+                The **MemePulse** is a decentralized analytical tool that uses an advanced heuristic model to evaluate the market potential of tokens, specifically aiming to predict short-term volatility and upward movement.
+            </p>
+            <p class="text-gray-400 leading-relaxed mt-3 text-sm">
+                The Oracle **Prediction** assesses the probability of market capitalization growth (a "pump") by considering:
+                <ul class="list-disc list-inside ml-4 mt-2 text-xs text-gray-400">
+                    <li>**MOMENTUM:** Price dynamics and relative strength.</li>
+                    <li>**MARKET ACTIVITY:** Transaction volume, whale movement, and trading frenzy.</li>
+                    <li>**SAFETY/STABILITY:** Liquidity level and contract tax structure.</li>
+                </ul>
+            </p>
+        </div>
+    </section>
+    <!-- END OF INTRODUCTION -->
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-0">
 
         <!-- Section 1: The Oracle - Token Search and Prediction -->
-        <section id="oracle" class="mb-12 bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
-            <h2 class="text-3xl font-bold mb-6 text-white border-b border-slate-600 pb-3">The Oracle: Live Token Analysis</h2>
-            <p class="text-slate-300 mb-6">Enter a token address (e.g., ETH, BSC, Solana chain) or a symbol for real-time data and experimental prediction.</p>
+        <section id="oracle" class="mb-12 bg-[var(--card-dark)] p-6 rounded-xl shadow-lg border border-[var(--border-color)]">
+            <h2 class="text-2xl font-bold mb-6 text-white border-b border-gray-700 pb-3">
+                TOKEN SEARCH (INITIATE SCAN)
+            </h2>
 
             <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
-                <input type="text" id="tokenAddressInput" placeholder="Enter Token Address (e.g., 0x...)"
-                       class="flex-1 p-3 rounded-xl bg-slate-900 text-white border border-slate-700 focus:ring-green-500 focus:border-green-500 transition placeholder-slate-500">
+                <input type="text" id="tokenAddressInput" placeholder="Enter Token Contract Address (e.g.: 0x...)"
+                       class="flex-1 p-3 rounded-lg bg-gray-900 text-[var(--primary-accent)] border border-gray-700 focus:ring-[var(--primary-accent)] focus:border-[var(--primary-accent)] transition placeholder-gray-500 text-base">
                 <button id="searchButton" onclick="handleSearch()"
-                        class="px-8 py-3 bg-green-600 text-white font-bold rounded-xl shadow-lg hover:bg-green-500 transition transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center">
-                    <i data-lucide="bar-chart-3" class="w-5 h-5 mr-2"></i>
-                    Analyze
+                        class="px-6 py-3 bg-[var(--secondary-accent)] text-white text-base font-semibold rounded-lg shadow-md hover:bg-orange-600 transition transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center border border-orange-300">
+                    <i data-lucide="scan" class="w-5 h-5 mr-2"></i>
+                    ANALYZE
                 </button>
             </div>
 
-            <div id="loadingIndicator" class="hidden mt-4 text-center text-green-400">
+            <div id="loadingIndicator" class="hidden mt-4 text-center text-[var(--primary-accent)] font-semibold text-base">
                 <svg class="animate-spin h-5 w-5 mr-3 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Loading Live Data...
+                FETCHING LIVE DATA...
             </div>
-            <div id="errorMessage" class="hidden mt-4 text-center p-3 rounded-lg bg-red-900/50 text-red-300 border border-red-700"></div>
+            <div id="errorMessage" class="hidden mt-4 text-center p-3 rounded-lg bg-red-900/40 text-red-300 border border-red-700 font-medium text-sm"></div>
         </section>
 
         <!-- Token Details and Chart Area -->
         <section id="tokenDetails" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
             
-            <!-- Prediction Card (The Oracle) -->
-            <div class="lg:col-span-1 bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700 flex flex-col justify-between transition-all duration-300 hover:shadow-green-500/20">
+            <!-- Left Column: Prediction Card (The Oracle) -->
+            <div class="lg:col-span-1 bg-[var(--card-dark)] p-6 rounded-xl shadow-lg border border-[var(--border-color)] flex flex-col justify-between transition-all duration-300">
                 <div>
-                    <h3 class="text-2xl font-bold mb-4 text-green-400 flex items-center">
-                        <i data-lucide="eye" class="w-5 h-5 mr-2"></i>
-                        Oracle Prediction
+                    <h3 class="text-xl font-bold mb-4 text-[var(--primary-accent)] flex items-center">
+                        <i data-lucide="zap" class="w-5 h-5 mr-2 text-[var(--secondary-accent)]"></i>
+                        ORACLE PREDICTION
                     </h3>
-                    <p class="text-slate-400 text-sm mb-4">The percentage shows the **Probability of Market Cap Growth** for the selected interval.</p>
+                    <p class="text-gray-400 text-xs mb-4">Probability of Market Cap increase over the selected interval.</p>
 
                     <div class="flex space-x-3 mb-6" id="predictionIntervals">
                         <!-- Prediction Interval Buttons -->
-                        <button onclick="runPrediction('15m')" class="interval-btn px-3 py-1 bg-green-700/50 text-sm rounded-full text-white border border-green-600 hover:bg-green-600 transition" data-interval="15m">15M</button>
-                        <button onclick="runPrediction('1h')" class="interval-btn px-3 py-1 bg-slate-700 text-sm rounded-full text-slate-300 border border-slate-600 hover:bg-green-600 transition" data-interval="1h">1H</button>
-                        <button onclick="runPrediction('1d')" class="interval-btn px-3 py-1 bg-slate-700 text-sm rounded-full text-slate-300 border border-slate-600 hover:bg-green-600 transition" data-interval="1d">1D</button>
-                        <button onclick="runPrediction('1w')" class="interval-btn px-3 py-1 bg-slate-700 text-sm rounded-full text-slate-300 border border-slate-600 hover:bg-green-600 transition" data-interval="1w">1W</button>
+                        <button onclick="runPrediction('15m')" class="interval-btn px-3 py-1 text-sm font-semibold bg-blue-700/70 rounded-full text-white border border-blue-500 hover:bg-blue-600 transition shadow-md active" data-interval="15m">15M</button>
+                        <button onclick="runPrediction('1h')" class="interval-btn px-3 py-1 text-sm font-semibold bg-gray-700/70 rounded-full text-gray-300 border border-gray-600 hover:bg-gray-600 transition shadow-md" data-interval="1h">1H</button>
+                        <button onclick="runPrediction('1d')" class="interval-btn px-3 py-1 text-sm font-semibold bg-gray-700/70 rounded-full text-gray-300 border border-gray-600 hover:bg-gray-600 transition shadow-md" data-interval="1d">1D</button>
+                        <button onclick="runPrediction('1w')" class="interval-btn px-3 py-1 text-sm font-semibold bg-gray-700/70 rounded-full text-gray-300 border border-gray-600 hover:bg-gray-600 transition shadow-md" data-interval="1w">1W</button>
                     </div>
 
-                    <div id="predictionResult" class="text-center p-6 rounded-xl border-4 border-green-700/50 bg-slate-900 transition duration-300">
-                        <p class="text-xl font-semibold mb-2 text-slate-400">Select a time interval for analysis.</p>
-                    </div>
-
-                    <!-- Detailed Analysis Breakdown -->
-                    <div id="predictionDetails" class="mt-6">
-                        <h4 class="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-3 flex items-center">
-                            <i data-lucide="file-text" class="w-4 h-4 mr-2 text-indigo-400"></i>
-                            Detailed Prediction Analysis
-                        </h4>
-                        <ul id="analysisList" class="space-y-2 text-sm text-slate-300">
-                            <li>Run an analysis to see the breakdown of factors affecting the score.</li>
-                        </ul>
+                    <div id="predictionResult" class="text-center p-6 rounded-lg border border-[var(--primary-accent)]/50 bg-gray-900 transition duration-300">
+                        <p class="text-base font-semibold text-white">Select a time interval.</p>
                     </div>
                 </div>
+                <!-- AUTOMATIC SAVE MESSAGE -->
                 <div class="mt-6">
-                    <p class="text-xs text-yellow-500 bg-yellow-900/30 p-2 rounded-lg border border-yellow-700">
-                        <span class="font-bold">IMPORTANT - NOT FINANCIAL ADVICE:</span> This prediction is experimental, based on a heuristic model, and MUST NOT be used for investment advice!
+                    <p id="saveStatusMessage" class="text-xs text-gray-400 font-medium text-center mb-3">Prediction history will be updated automatically.</p>
+                    <p class="text-xs text-red-500 bg-red-900/30 p-2 rounded-lg border border-red-700 font-bold text-center mt-3">
+                        THIS IS NOT FINANCIAL ADVICE. ALWAYS DO YOUR OWN RESEARCH (DYOR).
                     </p>
                 </div>
             </div>
 
-            <!-- Main Token Stats & Extra Data -->
+            <!-- Right Column: Main Token Stats, Expected MCAP & Extra Data (lg:col-span-2) -->
             <div class="lg:col-span-2 space-y-6">
                 
-                <!-- Price and Key Metrics -->
-                <div class="bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
-                    <div id="tokenHeader" class="flex justify-between items-start mb-4 pb-2 border-b border-slate-600">
+                <!-- PROMINENT: DexScreener Live Banner -->
+                <a id="dexscreenerLinkBanner" target="_blank" 
+                   class="hidden p-4 bg-gray-700/50 rounded-lg shadow-xl border border-gray-600 hover:bg-gray-700 transition flex items-center justify-between text-white font-semibold transform hover:scale-[1.005]">
+                    <div class="flex items-center space-x-4">
+                        <i data-lucide="bar-chart-3" class="w-8 h-8 text-[var(--primary-accent)]"></i>
                         <div>
-                            <p class="text-sm text-slate-400">Analyzed Pair</p>
-                            <h3 class="text-4xl font-extrabold text-white" id="tokenSymbol"></h3>
+                            <div class="text-xs text-gray-400">LIVE CHART & TRADING</div>
+                            <div class="text-xl font-extrabold text-white" id="bannerTokenSymbol"></div>
                         </div>
-                        <div class="text-right">
-                            <p class="text-sm text-slate-400">Current Price</p>
-                            <p class="text-5xl font-extrabold" id="currentPrice">$0.0000</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-2xl font-extrabold text-[var(--primary-accent)]" id="bannerCurrentPrice"></div>
+                        <div class="text-sm font-bold flex justify-end items-center mt-1" id="bannerPriceChange24h"></div>
+                    </div>
+                </a>
+
+                <!-- Price and Key Metrics -->
+                <div class="bg-[var(--card-dark)] p-6 rounded-xl shadow-lg border border-[var(--border-color)]">
+                    
+                    <!-- NEW: Split between Current Price and Expected MCAP -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                        <!-- Column 1: Current Price and Symbol -->
+                        <div class="pr-3 md:border-r border-gray-700">
+                            <div id="tokenHeader" class="flex justify-between items-start mb-4 pb-2 border-b border-gray-700">
+                                <div>
+                                    <p class="text-xs text-gray-400 font-bold">CURRENT PAIR</p>
+                                    <h3 class="text-3xl font-extrabold text-white" id="tokenSymbol"></h3>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-xs text-gray-400 font-bold">PRICE</p>
+                                    <p class="text-4xl font-extrabold text-[var(--primary-accent)]" id="currentPrice">$0.0000</p>
+                                </div>
+                            </div>
+                            <!-- Small Stats Row -->
+                            <div class="grid grid-cols-2 gap-3 mb-4 text-center">
+                                <div class="bg-gray-800 p-2 rounded-md border border-gray-700">
+                                    <p class="text-xs text-gray-400 font-medium">MARKET CAP (EST.)</p>
+                                    <p class="text-white font-bold text-lg" id="marketCap">$0</p>
+                                </div>
+                                <div class="bg-gray-800 p-2 rounded-md border border-gray-700">
+                                    <p class="text-xs text-gray-400 font-medium">24H CHANGE</p>
+                                    <p class="font-bold text-lg" id="priceChange24h">0.00%</p>
+                                </div>
+                            </div>
                         </div>
+
+                        <!-- Column 2: Expected Market Cap -->
+                        <div class="pl-3">
+                            <h3 class="text-xl font-bold mb-3 text-[var(--secondary-accent)] flex items-center">
+                                <i data-lucide="trending-up" class="w-5 h-5 mr-2"></i>
+                                EXPECTED VALUATION
+                            </h3>
+                            <p class="text-xs text-gray-400 mb-4">Market Cap forecast based on predicted pump probability.</p>
+                            
+                            <!-- Expected MCAP Result (Added break-words for overflow fix) -->
+                            <div id="expectedMcapResult" class="text-center p-4 rounded-lg border border-gray-600 bg-gray-900 transition duration-300 min-h-[100px] flex items-center justify-center break-words">
+                                <p class="text-base font-semibold text-gray-500">Select an interval to predict MCAP.</p>
+                            </div>
+
+                            <p class="text-xs text-red-500/70 font-medium text-center mt-3">
+                                *This is a mathematical estimate, not a guaranteed value.
+                            </p>
+                        </div>
+                    </div>
+                    <!-- End of Grid Split -->
+
+
+                    <!-- Bottom Info Row -->
+                    <div class="mt-4 pt-4 border-t border-gray-800">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-center">
+                            <div class="bg-gray-800 p-3 rounded-md border border-gray-700 md:col-span-2">
+                                <p class="text-xs text-gray-400 font-medium">24H VOLUME</p>
+                                <p class="text-white font-bold text-lg" id="volume24h">$0</p>
+                            </div>
+                            <div class="bg-gray-800 p-3 rounded-md border border-gray-700">
+                                <p class="text-xs text-gray-400 font-medium">LIQUIDITY (USD)</p>
+                                <p class="text-white font-bold text-lg" id="liquidity">$0</p>
+                            </div>
+                            <div class="bg-gray-800 p-3 rounded-md border border-gray-700">
+                                <p class="text-xs text-gray-400 font-medium">TOTAL TXNS (24H)</p>
+                                <p class="text-white font-bold text-lg" id="totalTxns">0</p>
+                            </div>
+                        </div>
+                        <!-- IMPORTANT FIX: Added break-all to the ADDRESS span and ensured the parent div/p uses flex or proper sizing -->
+                        <p class="text-xs text-gray-500 font-mono break-words">
+                            CHAIN: <span id="tokenChain" class="font-bold text-[var(--secondary-accent)]"></span> | 
+                            ADDRESS: <span id="tokenBaseAddress" class="font-mono text-xs text-gray-400 break-all"></span>
+                        </p>
                     </div>
 
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-center">
-                        <div class="bg-slate-700/50 p-3 rounded-lg">
-                            <p class="text-xs text-slate-400">Market Cap (Est.)</p>
-                            <p class="text-white font-bold text-lg" id="marketCap">$0</p>
-                        </div>
-                        <div class="bg-slate-700/50 p-3 rounded-lg">
-                            <p class="text-xs text-slate-400">24H Vol.</p>
-                            <p class="text-white font-bold text-lg" id="volume24h">$0</p>
-                        </div>
-                        <div class="bg-slate-700/50 p-3 rounded-lg">
-                            <p class="text-xs text-slate-400">24H Change</p>
-                            <p class="font-bold text-lg" id="priceChange24h">0.00%</p>
-                        </div>
-                        <div class="bg-slate-700/50 p-3 rounded-lg">
-                            <p class="text-xs text-slate-400">Liquidity (USD)</p>
-                            <p class="text-white font-bold text-lg" id="liquidity">$0</p>
-                        </div>
-                    </div>
-                    <p class="text-sm text-slate-500">Chain: <span id="tokenChain" class="font-medium text-slate-300"></span> | Address: <span id="tokenBaseAddress" class="font-mono text-xs text-slate-400"></span></p>
                 </div>
+            </div>
 
-                <!-- Transaction & Tax Data -->
-                <div class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
-                    <h4 class="text-xl font-bold mb-4 text-white flex items-center border-b border-slate-700 pb-2">
-                        <i data-lucide="scale" class="w-4 h-4 mr-2 text-indigo-400"></i>
-                        Transaction and Tax Metrics
-                    </h4>
-                    <div class="grid grid-cols-2 gap-4 text-center">
-                        <div class="bg-slate-700 p-3 rounded-lg">
-                            <p class="text-xs text-slate-400">24H Total Transactions</p>
-                            <p class="text-indigo-300 font-bold text-xl" id="txns24h">N/A</p>
-                        </div>
-                        <div class="bg-slate-700 p-3 rounded-lg">
-                            <p class="text-xs text-slate-400">5M Flippers (B/S)</p>
-                            <p class="text-indigo-300 font-bold text-xl" id="flippers5m">N/A</p>
-                        </div>
-                        <div class="bg-slate-700 p-3 rounded-lg">
-                            <p class="text-xs text-slate-400">Buy Tax</p>
-                            <p class="text-orange-400 font-bold text-xl" id="buyTax">N/A</p>
-                        </div>
-                        <div class="bg-slate-700 p-3 rounded-lg">
-                            <p class="text-xs text-slate-400">Sell Tax</p>
-                            <p class="text-orange-400 font-bold text-xl" id="sellTax">N/A</p>
-                        </div>
-                    </div>
+            <!-- Detailed Analysis Breakdown - Full Width -->
+            <div class="lg:col-span-3">
+                <h3 class="text-2xl font-bold mb-4 text-[var(--primary-accent)] flex items-center border-b border-gray-700 pb-2">
+                    <i data-lucide="list-checks" class="w-6 h-6 mr-2 text-[var(--secondary-accent)]"></i>
+                    DETAILED ORACLE REPORT
+                </h3>
+                <div id="detailedAnalysis" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Cards will be injected here -->
                 </div>
             </div>
 
 
-            <!-- Live Chart Container (TradingView Widget) -->
-            <div class="lg:col-span-3 bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700 mt-6">
-                <h3 class="text-xl font-bold mb-4 text-white flex items-center">
-                    <i data-lucide="trending-up" class="w-5 h-5 mr-2 text-green-400"></i>
-                    Live Price Chart (TradingView)
+            <!-- Live Chart Container (DexScreener Embed) - Full Width -->
+            <div class="lg:col-span-3 bg-[var(--card-dark)] p-6 rounded-xl shadow-lg border border-[var(--border-color)] mt-6">
+                <h3 class="text-2xl font-bold mb-4 text-[var(--primary-accent)] flex items-center">
+                    <i data-lucide="line-chart" class="w-6 h-6 mr-2 text-[var(--secondary-accent)]"></i>
+                    LIVE CHART
                 </h3>
-                <div id="chartContainer" class="h-[500px] w-full bg-slate-900 rounded-xl overflow-hidden flex items-center justify-center">
-                    <p class="p-6 text-center text-slate-500">Please search for a token to load the chart.</p>
+                <div id="chartContainer" class="h-[500px] w-full bg-gray-900 rounded-lg overflow-hidden flex items-center justify-center border border-gray-700">
+                    <p class="p-6 text-center text-gray-500 font-medium">Please search for a token to load the chart.</p>
+                </div>
+            </div>
+            
+            <!-- External Links & Safety - Full Width -->
+            <div class="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+
+                <!-- Card 1: External Security & Info Links -->
+                <div class="bg-[var(--card-dark)] p-6 rounded-xl shadow-lg border border-[var(--border-color)]">
+                    <h3 class="text-xl font-bold mb-4 text-[var(--primary-accent)] flex items-center">
+                        <i data-lucide="link" class="w-5 h-5 mr-2 text-[var(--secondary-accent)]"></i>
+                        EXTERNAL DUE DILIGENCE LINKS
+                    </h3>
+                    <div id="externalLinks" class="space-y-3">
+                        <p class="text-gray-500">Search for a token to load external links.</p>
+                    </div>
+                </div>
+
+                <!-- Card 2: Token Safety and Contract Risk Assessment -->
+                <div class="bg-[var(--card-dark)] p-6 rounded-xl shadow-lg border border-[var(--border-color)]">
+                    <h3 class="text-xl font-bold mb-4 text-[var(--primary-accent)] flex items-center">
+                        <i data-lucide="shield-alert" class="w-5 h-5 mr-2 text-[var(--secondary-accent)]"></i>
+                        TOKEN SAFETY CHECK (RUG-PULL RISK)
+                    </h3>
+                    <div id="safetyResult">
+                        <p class="text-gray-400">Run an analysis to see the contract risk assessment.</p>
+                    </div>
                 </div>
             </div>
 
         </section>
-
-        <!-- Section 2: Token Safety and Contract Risk Assessment -->
-        <section id="safetyCheck" class="hidden pt-8 mt-12 border-t border-slate-700">
-            <h2 class="text-3xl font-bold mb-6 text-white flex items-center">
-                <i data-lucide="shield-alert" class="w-6 h-6 mr-2 text-yellow-400"></i>
-                Token Safety and Risk Assessment
+        
+        <!-- Section 2: Prediction History -->
+        <section id="historySection" class="pt-8 mt-12 border-t border-gray-700">
+            <h2 class="text-2xl font-bold mb-6 text-white flex items-center">
+                <i data-lucide="history" class="w-6 h-6 mr-2 text-[var(--primary-accent)]"></i>
+                PREDICTION HISTORY (VERIFICATION)
             </h2>
-            <div id="safetyResult" class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
-                <p class="text-slate-400">Run an analysis first to view the contract risk assessment based on known metrics like taxes and liquidity.</p>
+            <div id="historyList" class="space-y-4">
+                <p class="text-gray-400 text-center p-4 bg-[var(--card-dark)] rounded-lg">Loading history... (Ensure Firebase is initialized)</p>
             </div>
         </section>
 
     </main>
 
-    <footer class="mt-12 py-6 border-t border-slate-800 text-center text-slate-500 text-sm">
+    <footer class="mt-12 py-6 border-t border-gray-800 text-center text-gray-500 text-sm">
         <script>lucide.createIcons();</script>
-        &copy; 2025 MemePulse Analytics. Data source: DexScreener and TradingView.
+        &copy; 2025 MemePulse Analytics. Data powered by DexScreener.
     </footer>
 
-    <script>
+    <script type="module">
+        import { getFirestore, doc, getDoc, addDoc, updateDoc, onSnapshot, collection, query, orderBy, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Constants and Global Variables
         const DEXSCREENER_BASE_URL = 'https://api.dexscreener.com/latest/dex/';
-        
-        let currentPairData = null; // Store the current pair data globally for prediction access
+        let currentPairData = null; 
+        let currentPrediction = null; 
+
+        // Get global references set up by the Firebase script module
+        const getDB = () => window.db;
+        const getUserId = () => window.userId;
 
         /**
          * Helper function: Formats numbers as currency (USD).
-         * @param {number} value 
-         * @returns {string} Formatted currency string.
          */
-        function formatCurrency(value) {
-            if (value === undefined || value === null || isNaN(value)) return 'N/A';
+        function formatCurrency(value, full = false) {
+            if (value === undefined || value === null || isNaN(value) || value < 0) return '$0';
+            
+            // If the value is very small, show more precision
+            if (value > 0 && value < 0.001) {
+                 return new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 6,
+                    maximumFractionDigits: 9,
+                }).format(value);
+            }
+
             return new Intl.NumberFormat('en-US', {
                 style: 'currency',
                 currency: 'USD',
-                notation: 'compact',
+                notation: full ? 'standard' : 'compact',
                 compactDisplay: 'short',
-                maximumSignificantDigits: 6,
+                minimumFractionDigits: value < 1 ? 4 : 2,
+                maximumSignificantDigits: full ? undefined : 6,
             }).format(value);
         }
 
         /**
-         * Helper function: Formats large numbers (e.g., for transactions).
-         * @param {number} value 
-         * @returns {string} Formatted number string.
+         * Helper function: Formats large numbers.
          */
         function formatNumber(value) {
             if (value === undefined || value === null || isNaN(value)) return 'N/A';
@@ -238,16 +447,20 @@
         }
 
         /**
-         * Helper function: Displays messages to the user.
-         * @param {string} message 
-         * @param {boolean} isError 
+         * Helper function: Displays user messages.
          */
         function displayMessage(message, isError = false) {
             const errorDiv = document.getElementById('errorMessage');
             errorDiv.innerHTML = message;
-            errorDiv.className = isError 
-                ? 'mt-4 text-center p-3 rounded-lg bg-red-900/50 text-red-300 border border-red-700'
-                : 'mt-4 text-center p-3 rounded-lg bg-green-900/50 text-green-300 border border-green-700';
+            
+            const baseClass = 'mt-4 text-center p-3 rounded-xl font-semibold border';
+
+            if (isError) {
+                errorDiv.className = `${baseClass} bg-red-900/40 text-red-300 border-red-700`;
+            } else {
+                errorDiv.className = `${baseClass} bg-blue-900/40 text-[var(--primary-accent)] border-[var(--primary-accent)]`;
+            }
+            
             errorDiv.classList.remove('hidden');
             setTimeout(() => errorDiv.classList.add('hidden'), 7000);
         }
@@ -255,25 +468,39 @@
         /**
          * Main search handler. Fetches token data.
          */
-        async function handleSearch() {
+        window.handleSearch = async function() {
             let address = document.getElementById('tokenAddressInput').value.trim();
             const loadingIndicator = document.getElementById('loadingIndicator');
             
             if (!address) {
-                displayMessage("Please enter a token address or symbol.", true);
+                displayMessage("PLEASE ENTER A TOKEN ADDRESS.", true);
                 return;
             }
 
             // UI update
             loadingIndicator.classList.remove('hidden');
             document.getElementById('tokenDetails').classList.add('hidden');
-            document.getElementById('safetyCheck').classList.add('hidden');
             document.getElementById('errorMessage').classList.add('hidden');
-            
+
             try {
                 const endpoint = `${DEXSCREENER_BASE_URL}tokens/${address}`;
-                
-                const response = await fetch(endpoint);
+                let response = null;
+                const maxRetries = 5;
+
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        response = await fetch(endpoint);
+                        if (response.ok) break; 
+                    } catch (error) {
+                         // Network error, delay and retry
+                    }
+                    if (i < maxRetries - 1) {
+                        const delay = Math.pow(2, i) * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        throw new Error("Too many API failures. Please try again later.");
+                    }
+                }
                 
                 if (!response.ok) {
                     throw new Error(`HTTP Error! Status: ${response.status}.`);
@@ -282,31 +509,32 @@
                 const data = await response.json();
 
                 if (!data.pairs || data.pairs.length === 0) {
-                    throw new Error("Token not found or no available trading pairs.");
+                    throw new Error("Token not found or no trading pair available.");
                 }
 
-                // Select the pair with the highest liquidity
                 const pair = data.pairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
                 
                 if (!pair) {
                     throw new Error("Failed to retrieve pair data.");
                 }
 
-                currentPairData = pair; // Store the data globally
+                currentPairData = pair;
                 
                 renderTokenDetails(pair);
-                renderTradingViewChart(pair);
-                runSafetyCheck(pair); // Run the safety check
+                renderPairChart(pair); 
+                renderExternalLinks(pair); 
+                runSafetyCheck(pair); 
 
                 document.getElementById('tokenDetails').classList.remove('hidden');
                 
-                // Reset prediction area and run default 15m prediction
+                // Run default 15m prediction (this will automatically save the prediction)
                 document.querySelector('.interval-btn[data-interval="15m"]').click();
+                displayMessage("ANALYSIS COMPLETE. CHECK THE ORACLE REPORT.");
 
 
             } catch (error) {
                 console.error('API Error: Search failed:', error);
-                displayMessage(`Analysis failed: ${error.message}. Please check the address/symbol.`, true);
+                displayMessage(`ANALYSIS FAILED: ${error.message}. CHECK ADDRESS.`, true);
             } finally {
                 loadingIndicator.classList.add('hidden');
                 lucide.createIcons();
@@ -314,16 +542,14 @@
         }
 
         /**
-         * Displays core and supplementary token statistics.
-         * @param {object} pair 
+         * Renders the core token stats and the banner.
          */
         function renderTokenDetails(pair) {
             const price = pair.priceUsd ? parseFloat(pair.priceUsd) : 0;
             const priceChange24h = pair.priceChange?.h24 || 0;
-            // Market Cap Estimate: use FDV if available, otherwise Liquidity * 5 (raw estimate)
             const marketCap = pair.fdv || (pair.liquidity?.usd ? pair.liquidity.usd * 5 : 0); 
+            const txns24h = (pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0);
             
-            // Core Data
             document.getElementById('tokenSymbol').textContent = `${pair.baseToken.symbol}/${pair.quoteToken.symbol}`;
             document.getElementById('currentPrice').textContent = formatCurrency(price);
             document.getElementById('marketCap').textContent = formatCurrency(marketCap);
@@ -331,90 +557,97 @@
             document.getElementById('liquidity').textContent = formatCurrency(pair.liquidity?.usd);
             document.getElementById('tokenChain').textContent = pair.chainId.toUpperCase();
             document.getElementById('tokenBaseAddress').textContent = pair.baseToken.address;
+            document.getElementById('totalTxns').textContent = formatNumber(txns24h);
             
             const priceChangeElement = document.getElementById('priceChange24h');
             priceChangeElement.textContent = `${priceChange24h.toFixed(2)}%`;
-            priceChangeElement.className = priceChange24h >= 0 ? 'text-green-400 font-bold text-lg' : 'text-red-400 font-bold text-lg';
+            priceChangeElement.className = priceChange24h >= 0 ? 'text-lime-400 font-bold text-lg' : 'text-red-400 font-bold text-lg';
 
-            // Transaction Data
-            document.getElementById('txns24h').textContent = formatNumber((pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0)) || 'N/A';
-            document.getElementById('flippers5m').textContent = `${formatNumber(pair.txns?.m5?.buys || 0)} B / ${formatNumber(pair.txns?.m5?.sells || 0)} S`;
-            document.getElementById('buyTax').textContent = `${(pair.pairContract?.buyTax || 0).toFixed(2)}%`;
-            document.getElementById('sellTax').textContent = `${(pair.pairContract?.sellTax || 0).toFixed(2)}%`;
+            const banner = document.getElementById('dexscreenerLinkBanner');
+            const dexscreenerUrl = `https://dexscreener.com/${pair.chainId}/${pair.pairAddress}`;
+            banner.href = dexscreenerUrl;
+            banner.classList.remove('hidden');
+
+            document.getElementById('bannerTokenSymbol').textContent = `${pair.baseToken.symbol}/${pair.quoteToken.symbol} (${pair.chainId.toUpperCase()})`;
+            document.getElementById('bannerCurrentPrice').textContent = formatCurrency(price);
+
+            const bannerPriceChangeElement = document.getElementById('bannerPriceChange24h');
+            const icon = priceChange24h >= 0 ? 'trending-up' : 'trending-down';
+            const colorClass = priceChange24h >= 0 ? 'text-lime-400' : 'text-red-400';
+
+            bannerPriceChangeElement.innerHTML = `
+                <i data-lucide="${icon}" class="w-4 h-4 mr-1"></i>
+                ${priceChange24h.toFixed(2)}% (24H)
+            `;
+            bannerPriceChangeElement.className = `${colorClass} text-sm font-bold flex justify-end items-center`;
+            lucide.createIcons();
         }
 
-        /**
-         * Loads the TradingView Widget based on DexScreener pair data.
-         * FIX: Handles symbol conversion for better TradingView compatibility.
-         * @param {object} pair 
-         */
-        function renderTradingViewChart(pair) {
-            const chartContainer = document.getElementById('chartContainer');
-            chartContainer.innerHTML = ''; // Clear previous content
 
-            // Attempt to create a standard TradingView symbol. 
-            // This is the common failure point for new DEX coins.
-            const baseSymbol = pair.baseToken.symbol;
-            let quoteSymbol = pair.quoteToken.symbol; 
+        /**
+         * Renders the Expected Market Cap based on the prediction probability.
+         */
+        function renderExpectedMcap(probability, marketCap, interval) {
+            const resultDiv = document.getElementById('expectedMcapResult');
+            let expectedChangeMultiplier = 0; // The base multiplier for expected MCAP growth
+
+            // Multiplier logic is highly speculative and based on the prediction score
+            // Low risk (score 50-70): 5% - 20% growth multiplier
+            // High risk (score 70+): 20% - 50%+ growth multiplier
             
-            // Common conversions for centralized exchange symbols
-            if (quoteSymbol === 'WETH' || quoteSymbol === 'ETH') quoteSymbol = 'USDT';
-            if (quoteSymbol === 'WBNB' || quoteSymbol === 'BNB') quoteSymbol = 'USDT';
-            if (quoteSymbol === 'USDC' || quoteSymbol === 'DAI') quoteSymbol = 'USDT';
+            if (probability < 40) {
+                 // Bearish/Neutral prediction: 0% to -10% expected change
+                 expectedChangeMultiplier = (probability - 50) * 0.005; // e.g. 30 score -> -0.1
+            } else {
+                 // Bullish prediction: 5% to 50% expected change depending on score and interval
+                 expectedChangeMultiplier = (probability - 50) * 0.01; // e.g. 70 score -> 0.2
+            }
             
-            // Try major exchange (BINANCE) symbol mapping as a common fallback
-            let tradingSymbol = `BINANCE:${baseSymbol}${quoteSymbol}`; 
+            // Further adjust multiplier based on time interval (longer intervals have slightly higher potential growth)
+            if (interval === '1h') expectedChangeMultiplier *= 1.1;
+            else if (interval === '1d') expectedChangeMultiplier *= 1.3;
+            else if (interval === '1w') expectedChangeMultiplier *= 1.5;
+
+            // Cap the expected growth (to avoid insane, unrealistic numbers)
+            expectedChangeMultiplier = Math.min(1.0, expectedChangeMultiplier); // Max 100% expected growth
             
-            // If the quote token is still not a major one, default to a general DEX symbol
-            if (quoteSymbol !== 'USDT') {
-                 tradingSymbol = `${baseSymbol}USD`;
+            const expectedMcap = marketCap * (1 + expectedChangeMultiplier);
+            const changePercent = expectedChangeMultiplier * 100;
+
+            let colorClass = 'text-white';
+            let icon = 'trending-up';
+            if (changePercent > 10) {
+                 colorClass = 'text-lime-400';
+            } else if (changePercent < 0) {
+                 colorClass = 'text-red-400';
+                 icon = 'trending-down';
+            } else {
+                 colorClass = 'text-yellow-400';
             }
 
-            // TradingView widget integration
-            const script = document.createElement('script');
-            script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-            script.async = true;
-            script.innerHTML = JSON.stringify({
-                "width": "100%",
-                "height": "100%",
-                "symbol": tradingSymbol,
-                "interval": "60", // 1-hour candles
-                "timezone": "Europe/Budapest",
-                "theme": "dark",
-                "style": "1",
-                "locale": "en", 
-                "allow_symbol_change": true,
-                "save_image": false,
-                "container_id": "chartContainer",
-                "calendar": false,
-                "support_host": "https://www.tradingview.com"
-            });
-            chartContainer.appendChild(script);
-
-             // Add a fallback message if the chart doesn't load
-             const fallbackTimeout = setTimeout(() => {
-                const iframe = chartContainer.querySelector('iframe');
-                if (!iframe || iframe.src.indexOf('error') !== -1) {
-                    chartContainer.innerHTML = `
-                        <p class="p-6 text-center text-red-400">
-                            <i data-lucide="alert-triangle" class="w-6 h-6 mr-2 inline-block"></i>
-                            WARNING: TradingView could not load the chart for symbol ${tradingSymbol}. 
-                            This often happens with very new or low-cap DEX tokens. The data below is still live, but the chart is unavailable.
-                        </p>
-                    `;
-                    lucide.createIcons();
-                }
-            }, 3000);
+            const htmlContent = `
+                <p class="text-xs text-gray-400 font-bold">ESTIMATED MCAP (${interval.toUpperCase()})</p>
+                <div class="flex items-center justify-center space-x-2 mt-1">
+                    <p class="text-3xl font-extrabold ${colorClass}">${formatCurrency(expectedMcap, true)}</p>
+                </div>
+                <p class="text-sm font-semibold mt-1 flex items-center justify-center ${colorClass}">
+                    <i data-lucide="${icon}" class="w-4 h-4 mr-1"></i>
+                    ${changePercent > 0 ? '+' : ''}${changePercent.toFixed(1)}% Expected Change
+                </p>
+            `;
+            
+            resultDiv.innerHTML = htmlContent;
+            lucide.createIcons();
         }
 
-        
+
         /**
-         * Runs the experimental prediction (Advanced Heuristic Model).
-         * @param {string} interval 
+         * Runs the experimental prediction (Advanced Heuristic Model) and displays detailed report cards.
          */
-        function runPrediction(interval) {
+        window.runPrediction = function(interval) {
             if (!currentPairData) {
-                document.getElementById('predictionResult').innerHTML = `<p class="text-xl font-semibold mb-2 text-slate-400">Run an analysis first!</p>`;
+                document.getElementById('predictionResult').innerHTML = `<p class="text-base font-semibold text-white">RUN AN ANALYSIS FIRST.</p>`;
+                document.getElementById('expectedMcapResult').innerHTML = `<p class="text-base font-semibold text-gray-500">Run an analysis first.</p>`;
                 return;
             }
             
@@ -422,82 +655,138 @@
 
             // Update button styles
             document.querySelectorAll('.interval-btn').forEach(btn => {
-                btn.classList.remove('bg-green-700/50', 'border-green-600', 'text-white');
-                btn.classList.add('bg-slate-700', 'border-slate-600', 'text-slate-300');
+                btn.classList.remove('active');
+                btn.classList.remove('bg-blue-700/70', 'border-blue-500', 'text-white');
+                btn.classList.add('bg-gray-700/70', 'border-gray-600', 'text-gray-300');
             });
             const activeBtn = document.querySelector(`.interval-btn[data-interval="${interval}"]`);
-            activeBtn.classList.add('bg-green-700/50', 'border-green-600', 'text-white');
-            activeBtn.classList.remove('bg-slate-700', 'border-slate-600', 'text-slate-300');
+            activeBtn.classList.add('active');
+            activeBtn.classList.add('bg-blue-700/70', 'border-blue-500', 'text-white');
+            activeBtn.classList.remove('bg-gray-700/70', 'border-gray-600', 'text-gray-300');
 
             // --- DATA EXTRACTION ---
             const priceChange24h = pair.priceChange?.h24 || 0;
-            const txns24h = (pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0);
-            const volume24h = pair.volume?.h24 || 0;
+            const buys24h = pair.txns?.h24?.buys || 0;
+            const sells24h = pair.txns?.h24?.sells || 0;
+            const txns24h = buys24h + sells24h;
             const liquidity = pair.liquidity?.usd || 0;
             const marketCap = pair.fdv || (liquidity * 5);
             const buyTax = pair.pairContract?.buyTax || 0;
             const sellTax = pair.pairContract?.sellTax || 0;
 
             // --- PREDICITION MODEL & SCORING ---
-            let score = 50; // Neutral start score
-            let analysisNotes = [];
+            let score = 50; 
+            const detailedAnalysis = [];
 
-            // 1. MOMENTUM (Weight 40%) - Based on 24H Price Change
+            // 1. MOMENTUM (Weight 40%)
             let momentumContribution = 0;
+            let momentumNote = 'Flat movement over 24H.';
+            let momentumIcon = 'trending-up';
+            let momentumColor = 'text-yellow-400';
+
             if (priceChange24h >= 10) {
-                momentumContribution = Math.min(20, priceChange24h * 0.5); // Max +20
-                analysisNotes.push({type: 'up', text: `Strong Momentum: 24H price is up by ${priceChange24h.toFixed(2)}%.`});
-            } else if (priceChange24h > 0) {
-                momentumContribution = Math.min(10, priceChange24h * 0.5); // Max +10
-                analysisNotes.push({type: 'up', text: `Positive Momentum: Price is in an upward trend over 24H.`});
+                momentumContribution = Math.min(20, priceChange24h * 0.5); 
+                momentumNote = `STRONG BULLISH: Price surged by ${priceChange24h.toFixed(2)}%. High positive volatility.`;
+                momentumColor = 'text-lime-400';
             } else if (priceChange24h <= -10) {
-                momentumContribution = Math.max(-15, priceChange24h * 0.5); // Max -15
-                analysisNotes.push({type: 'down', text: `Negative Momentum: 24H price is down by ${Math.abs(priceChange24h).toFixed(2)}%.`});
+                momentumContribution = Math.max(-15, priceChange24h * 0.5); 
+                momentumNote = `BEARISH PRESSURE: Price dropped by ${Math.abs(priceChange24h).toFixed(2)}%. Avoid entering now.`;
+                momentumIcon = 'trending-down';
+                momentumColor = 'text-red-400';
+            } else if (priceChange24h > 0) {
+                momentumContribution = Math.min(10, priceChange24h * 0.5); 
+                momentumNote = `POSITIVE TREND: Price is slowly climbing. Good sign for continuation.`;
+                momentumColor = 'text-lime-400';
             }
             score += momentumContribution;
 
-            // 2. MARKET ACTIVITY (Weight 30%) - Based on 24H Transactions & Volume/Cap ratio
+            detailedAnalysis.push({
+                title: 'MOMENTUM SCORE',
+                score: Math.round(50 + momentumContribution),
+                icon: momentumIcon,
+                color: momentumColor,
+                value: `${priceChange24h.toFixed(2)}% (24H)`,
+                explanation: momentumNote
+            });
+
+
+            // 2. MARKET ACTIVITY (Weight 30%)
             let activityContribution = 0;
-            const volumeToCapRatio = marketCap > 0 ? volume24h / marketCap : 0;
+            let activityNote = 'Low trading activity in 24H.';
+            let activityIcon = 'bolt';
+            let activityColor = 'text-gray-400';
+            const buySellRatio = buys24h / (sells24h || 1);
             
             if (txns24h >= 10000) {
                 activityContribution += 10;
-                analysisNotes.push({type: 'up', text: `High Activity: ${formatNumber(txns24h)} transactions, indicating strong community interest.`});
+                activityNote = `EXTREME FRENZY: ${formatNumber(txns24h)} total transactions. Whale activity is likely high.`;
+                activityColor = 'text-fuchsia-400';
             } else if (txns24h >= 2000) {
                 activityContribution += 5;
-                analysisNotes.push({type: 'up', text: `Moderate Activity: Healthy transaction volume over 24H.`});
+                activityNote = `HEALTHY VOLUME: Consistent buy/sell pressure. Good liquidity flow.`;
+                activityColor = 'text-blue-400';
             }
 
-            if (volumeToCapRatio >= 0.5) { // If Volume is half the Market Cap, very volatile/high interest
+            if (buySellRatio > 1.2) { // More buys than sells
                 activityContribution += 5;
-                analysisNotes.push({type: 'up', text: `Extreme Volatility: Volume/Cap ratio of ${(volumeToCapRatio * 100).toFixed(0)}% suggests high trading interest.`});
+                activityNote += ` BUY DOMINANCE (${(buySellRatio * 100).toFixed(0)}% Buy Volume).`;
+            } else if (buySellRatio < 0.8) { // More sells than buys
+                 activityContribution -= 5;
+                 activityNote += ` SELL DOMINANCE. Caution advised.`;
+                 activityColor = 'text-red-400';
             }
             score += activityContribution;
 
+            detailedAnalysis.push({
+                title: 'ACTIVITY & WHALES',
+                score: Math.round(50 + activityContribution),
+                icon: activityIcon,
+                color: activityColor,
+                value: `${formatNumber(txns24h)} TXNs (24H)`,
+                explanation: activityNote
+            });
 
-            // 3. SAFETY/STABILITY (Weight 30%) - Based on Liquidity and Taxes
+
+            // 3. SAFETY/STABILITY (Weight 30%)
             let safetyContribution = 0;
-            
+            let safetyNote = 'Uncertain liquidity and moderate taxes.';
+            let safetyIcon = 'shield';
+            let safetyColor = 'text-yellow-400';
+            const combinedTax = buyTax + sellTax;
+
             if (liquidity >= 500000) {
                 safetyContribution += 10;
-                analysisNotes.push({type: 'up', text: `High Liquidity: ${formatCurrency(liquidity)} USD provides stability and low slippage.`});
+                safetyNote = `HIGH LIQUIDITY: ${formatCurrency(liquidity)} locked. Low slippage & rug-pull risk.`;
+                safetyColor = 'text-lime-400';
             } else if (liquidity < 100000) {
                 safetyContribution -= 15;
-                analysisNotes.push({type: 'down', text: `Low Liquidity: ${formatCurrency(liquidity)} USD introduces high volatility risk.`});
+                safetyNote = `CRITICAL LIQUIDITY: ${formatCurrency(liquidity)}. VERY high rug-pull risk if not burned/locked.`;
+                safetyColor = 'text-red-400';
+                safetyIcon = 'skull';
             }
 
-            const combinedTax = buyTax + sellTax;
             if (combinedTax > 15) {
                 safetyContribution -= 10;
-                analysisNotes.push({type: 'down', text: `High Taxes: Combined tax of ${combinedTax.toFixed(2)}% discourages holding and trading.`});
+                safetyNote += ` HIGH TAXES (${combinedTax.toFixed(2)}%): May discourage short-term trading.`;
+                safetyColor = 'text-red-400';
             } else if (combinedTax < 5) {
                 safetyContribution += 5;
-                analysisNotes.push({type: 'up', text: `Low Taxes: Attractive tax structure (${combinedTax.toFixed(2)}%) for traders.`});
+                safetyNote += ` LOW TAXES (${combinedTax.toFixed(2)}%): Ideal for trading.`;
+                safetyColor = 'text-lime-400';
             }
             score += safetyContribution;
+            
+            detailedAnalysis.push({
+                title: 'LIQUIDITY & TAXES',
+                score: Math.round(50 + safetyContribution),
+                icon: safetyIcon,
+                color: safetyColor,
+                value: `${combinedTax.toFixed(2)}% TAX`,
+                explanation: safetyNote
+            });
 
 
-            // --- INTERVAL ADJUSTMENT (Small multiplier based on requested time horizon) ---
+            // --- FINAL SCORE & INTERVAL ADJUSTMENT ---
             let finalScore = score;
             if (interval === '15m') finalScore = score * 1.05;
             else if (interval === '1h') finalScore = score * 1.02;
@@ -506,96 +795,384 @@
             // Clamp probability between 5% and 95%
             finalScore = Math.max(5, Math.min(95, finalScore));
             const probability = finalScore;
-            const fallProbability = 100 - probability;
             
             let message = '';
             let colorClass = '';
-            let riskLevel = 'Neutral';
+            let riskLevel = 'NEUTRAL';
 
             if (probability >= 70) {
-                message = `High Probability for **Market Cap Growth**!`;
-                colorClass = 'border-green-500 bg-green-900/50';
-                riskLevel = 'Bullish (Strong)';
-            } else if (probability >= 60) {
-                message = `Moderate chance for **Market Cap Growth**.`;
+                message = `CRITICAL ALERT: HIGH PROBABILITY OF PUMP IMMINENT!`;
                 colorClass = 'border-lime-500 bg-lime-900/50';
-                riskLevel = 'Bullish (Moderate)';
-            } else if (probability <= 40) {
-                message = `**Market Cap Decline** is likely!`;
-                colorClass = 'border-red-500 bg-red-900/50';
-                riskLevel = 'Bearish';
-            } else {
-                message = `**Consolidation / High Volatility** expected.`;
+                riskLevel = 'BULLISH (MAX)';
+            } else if (probability >= 60) {
+                message = `MODERATE CHANCE FOR UPWARD MOVEMENT. PROCEED WITH CAUTION.`;
                 colorClass = 'border-yellow-500 bg-yellow-900/50';
-                riskLevel = 'Sideways';
+                riskLevel = 'BULLISH (MODERATE)';
+            } else if (probability <= 40) {
+                message = `RED ALERT: DUMP IMMINENT. AVOID ENTRY.`;
+                colorClass = 'border-red-500 bg-red-900/50';
+                riskLevel = 'BEARISH';
+            } else {
+                message = `HIGH VOLATILITY DETECTED. NEUTRAL BIAS.`;
+                colorClass = 'border-orange-500 bg-orange-900/50';
+                riskLevel = 'NEUTRAL';
             }
 
-            // --- RENDER RESULTS ---
+            // Store the current prediction details globally
+            currentPrediction = {
+                address: pair.baseToken.address,
+                symbol: pair.baseToken.symbol,
+                chain: pair.chainId,
+                predictedInterval: interval,
+                predictedScore: probability,
+                initialPriceUsd: parseFloat(pair.priceUsd),
+                initialMarketCap: marketCap,
+                initialTxns24h: txns24h,
+            };
+            
+            // --- RENDER RESULTS (ORACLE CARD) ---
+            const predictionResult = document.getElementById('predictionResult');
             const formattedMessage = `
                 <div class="flex justify-around items-center space-x-4 mb-3">
                     <div class="text-center">
-                        <p class="text-xs text-slate-400">Growth Probability</p>
-                        <p class="text-5xl font-extrabold text-green-300">${probability.toFixed(0)}%</p>
+                        <p class="text-xs text-gray-400 font-bold">PUMP PROBABILITY</p>
+                        <p class="text-5xl font-extrabold text-[var(--primary-accent)]">${probability.toFixed(0)}%</p>
                     </div>
                     <div class="text-center">
-                        <p class="text-xs text-slate-400">Fall Probability</p>
-                        <p class="text-3xl font-extrabold text-red-300">${fallProbability.toFixed(0)}%</p>
+                        <p class="text-xs text-gray-400 font-bold">DUMP PROBABILITY</p>
+                        <p class="text-2xl font-extrabold text-red-300">${(100 - probability).toFixed(0)}%</p>
                     </div>
                 </div>
-                <p class="text-lg font-semibold text-white">${message}</p>
-                <p class="text-sm text-slate-400 mt-2">Prediction for the next ${interval.toUpperCase()} interval. **Risk Level: ${riskLevel}**</p>
+                <p class="text-lg font-extrabold text-white mt-4">${message}</p>
+                <p class="text-xs text-gray-400 mt-2 font-mono">NEXT ${interval.toUpperCase()} PREDICTION. SENTIMENT: ${riskLevel}</p>
             `;
 
             predictionResult.innerHTML = formattedMessage;
-            predictionResult.className = `text-center p-6 rounded-xl border-4 ${colorClass} transition duration-300`;
+            predictionResult.className = `text-center p-6 rounded-lg border ${colorClass} transition duration-300`;
 
-            // RENDER ANALYSIS NOTES
-            const analysisList = document.getElementById('analysisList');
-            analysisList.innerHTML = analysisNotes.map(note => {
-                const icon = note.type === 'up' 
-                    ? `<i data-lucide="chevron-up" class="w-4 h-4 mr-2 text-green-400 flex-shrink-0 mt-1"></i>` 
-                    : `<i data-lucide="chevron-down" class="w-4 h-4 mr-2 text-red-400 flex-shrink-0 mt-1"></i>`;
-                return `<li class="flex items-start">${icon}${note.text}</li>`;
-            }).join('');
+            // --- RENDER EXPECTED MCAP ---
+            renderExpectedMcap(probability, marketCap, interval);
+            
+            // --- AUTOMATICALLY SAVE PREDICTION ---
+            autoSavePrediction();
 
+
+            // --- RENDER DETAILED ANALYSIS CARDS ---
+            const detailedAnalysisContainer = document.getElementById('detailedAnalysis');
+            detailedAnalysisContainer.innerHTML = detailedAnalysis.map(item => `
+                <div class="analysis-detail p-5 rounded-lg shadow-md">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-lg font-extrabold text-white flex items-center">
+                            <i data-lucide="${item.icon}" class="w-5 h-5 mr-2 ${item.color}"></i>${item.title}
+                        </h4>
+                        <span class="text-xl font-extrabold ${item.color}">${item.score}/100</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mb-3 font-mono">${item.value}</p>
+                    <p class="text-sm text-gray-300 break-words">${item.explanation}</p>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        /**
+         * Saves the current prediction data to Firestore automatically.
+         */
+        window.autoSavePrediction = async function() {
+            if (!currentPrediction || !getDB() || !getUserId()) {
+                // If not ready, skip the save silently.
+                return;
+            }
+
+            const db = getDB();
+            const userId = getUserId();
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            
+            const predictionData = {
+                ...currentPrediction,
+                predictionTime: serverTimestamp(),
+                status: 'PENDING',
+                __path: `/artifacts/${appId}/users/${userId}/predictions`, 
+            };
+            
+            try {
+                const collectionRef = collection(db, `artifacts/${appId}/users/${userId}/predictions`);
+                await addDoc(collectionRef, predictionData);
+                
+                // Display a subtle message about saving
+                const statusEl = document.getElementById('saveStatusMessage');
+                if (statusEl) {
+                    statusEl.textContent = `Prediction for ${currentPrediction.symbol} (${currentPrediction.predictedInterval.toUpperCase()}) SAVED.`;
+                    statusEl.classList.remove('text-gray-400', 'text-red-400');
+                    statusEl.classList.add('text-lime-400');
+                    setTimeout(() => {
+                        statusEl.textContent = 'Prediction history will be updated automatically.';
+                        statusEl.classList.add('text-gray-400');
+                        statusEl.classList.remove('text-lime-400');
+                    }, 5000);
+                }
+
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                // Display an error in the save message area
+                const statusEl = document.getElementById('saveStatusMessage');
+                if (statusEl) {
+                    statusEl.textContent = `ERROR SAVING: ${e.message}`;
+                    statusEl.classList.remove('text-gray-400', 'text-lime-400');
+                    statusEl.classList.add('text-red-400');
+                }
+            }
+        }
+
+
+        /**
+         * Loads and renders the prediction history from Firestore.
+         */
+        window.loadHistory = function() {
+            const db = getDB();
+            const userId = getUserId();
+            const historyList = document.getElementById('historyList');
+
+            if (!db || !userId) {
+                historyList.innerHTML = `<p class="text-gray-400 text-center p-4 bg-[var(--card-dark)] rounded-lg">Firebase not ready. Please wait...</p>`;
+                return;
+            }
+            
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const collectionPath = `artifacts/${appId}/users/${userId}/predictions`;
+            // Order by time descending to show newest first
+            const q = query(collection(db, collectionPath), orderBy("predictionTime", "desc"));
+            
+            // Set up real-time listener
+            onSnapshot(q, (snapshot) => {
+                if (snapshot.empty) {
+                    historyList.innerHTML = `<p class="text-gray-400 text-center p-4 bg-[var(--card-dark)] rounded-lg">No history saved yet. Analyze a token to automatically save a prediction.</p>`;
+                    return;
+                }
+
+                historyList.innerHTML = snapshot.docs.map(doc => renderHistoryItem(doc.id, doc.data())).join('');
+                lucide.createIcons();
+            }, (error) => {
+                console.error("Error listening to history:", error);
+                historyList.innerHTML = `<p class="text-red-400 text-center p-4 bg-[var(--card-dark)] rounded-lg">Error loading history: ${error.message}</p>`;
+            });
+        }
+
+        /**
+         * Renders a single history item HTML.
+         */
+        function renderHistoryItem(id, data) {
+            const time = data.predictionTime?.toDate ? data.predictionTime.toDate().toLocaleString() : 'N/A';
+            const predictedScore = data.predictedScore.toFixed(0);
+            const status = data.status || 'PENDING';
+
+            let outcomeDisplay = `<span class="text-gray-500 font-semibold">${status}</span>`;
+            let outcomeButton = `<button onclick="checkActualOutcome('${id}', '${data.address}', '${data.chain}')" 
+                                        class="px-3 py-1 text-xs bg-blue-700 rounded hover:bg-blue-600 transition">
+                                        Recheck Outcome
+                                  </button>`;
+            let outcomeColor = 'text-yellow-400';
+            
+            if (status === 'COMPLETED' && data.actualChangePercent !== undefined) {
+                const isCorrect = data.isCorrect;
+                const change = data.actualChangePercent.toFixed(2);
+                const initialCap = formatCurrency(data.initialMarketCap, true);
+                const actualCap = formatCurrency(data.actualMarketCap, true);
+
+                outcomeColor = isCorrect ? 'text-lime-400' : 'text-red-400';
+                
+                // Determine if the prediction was correct (simplified logic: if predicted > 50% and actual > 0%, or vice-versa)
+                const predictionType = data.predictedScore > 50 ? 'BULLISH' : 'BEARISH';
+                const actualType = data.actualChangePercent > 0 ? 'BULLISH' : 'BEARISH';
+                
+                const correctnessText = isCorrect 
+                    ? `<span class="text-lime-400 flex items-center font-bold"><i data-lucide="check-circle" class="w-4 h-4 mr-1"></i> CORRECT (${predictionType})</span>` 
+                    : `<span class="text-red-400 flex items-center font-bold"><i data-lucide="x-circle" class="w-4 h-4 mr-1"></i> INCORRECT (${predictionType})</span>`;
+
+                outcomeDisplay = `
+                    <div class="space-y-1 text-sm">
+                        <p class="font-bold">Actual Change: <span class="${change >= 0 ? 'text-lime-400' : 'text-red-400'}">${change}%</span></p>
+                        <p class="text-xs text-gray-400">Initial Cap: ${initialCap}</p>
+                        <p class="text-xs text-gray-400">Current Cap: ${actualCap}</p>
+                        ${correctnessText}
+                    </div>
+                `;
+                outcomeButton = `<button onclick="checkActualOutcome('${id}', '${data.address}', '${data.chain}')" 
+                                        class="px-3 py-1 text-xs bg-gray-600 rounded hover:bg-gray-500 transition">
+                                        Recheck Outcome
+                                  </button>`;
+            }
+
+
+            return `
+                <div class="bg-[var(--card-dark)] p-4 rounded-xl shadow-lg border border-[var(--border-color)] grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                    <div class="md:col-span-2">
+                        <p class="text-lg font-bold text-white">${data.symbol} (${data.chain.toUpperCase()})</p>
+                        <p class="text-xs text-gray-400 font-mono break-all">${data.address}</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-gray-400">INTERVAL</p>
+                        <p class="font-bold text-[var(--primary-accent)]">${data.predictedInterval.toUpperCase()}</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-gray-400">PREDICTION</p>
+                        <p class="text-2xl font-extrabold ${outcomeColor}">${predictedScore}%</p>
+                        <p class="text-xs text-gray-500">@ ${time}</p>
+                    </div>
+                    <div class="md:text-right flex flex-col items-end space-y-2">
+                        ${outcomeDisplay}
+                        ${outcomeButton}
+                    </div>
+                </div>
+            `;
+        }
+
+        /**
+         * Checks the current market cap against the stored initial cap for verification.
+         */
+        window.checkActualOutcome = async function(docId, address, chain) {
+            const db = getDB();
+            const userId = getUserId();
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+            displayMessage(`Rechecking outcome for ${address.substring(0, 10)}...`);
+
+            try {
+                // 1. Fetch current live data
+                const endpoint = `${DEXSCREENER_BASE_URL}tokens/${address}`;
+                let response = null;
+                const maxRetries = 5;
+
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        response = await fetch(endpoint);
+                        if (response.ok) break; 
+                    } catch (error) {
+                         // Network error, delay and retry
+                    }
+                    if (i < maxRetries - 1) {
+                        const delay = Math.pow(2, i) * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        throw new Error("Too many API failures. Please try again later.");
+                    }
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP Error! Status: ${response.status}.`);
+                }
+
+                const data = await response.json();
+                
+                if (!data.pairs || data.pairs.length === 0) {
+                     throw new Error("Live data fetch failed.");
+                }
+                const livePair = data.pairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+                
+                const currentMarketCap = livePair.fdv || (livePair.liquidity?.usd ? livePair.liquidity.usd * 5 : 0);
+                const currentPrice = parseFloat(livePair.priceUsd);
+
+                // 2. Fetch stored prediction data
+                const docRef = doc(db, `artifacts/${appId}/users/${userId}/predictions`, docId);
+                const docSnap = await getDoc(docRef);
+
+                if (!docSnap.exists()) {
+                    throw new Error("Prediction record not found.");
+                }
+                const storedData = docSnap.data();
+
+                // 3. Calculate metrics
+                const initialMarketCap = storedData.initialMarketCap || 0;
+                const actualChangePercent = (currentMarketCap / initialMarketCap - 1) * 100;
+                
+                // Simplified correctness check:
+                // Correct if BULLISH prediction (score > 50) resulted in positive change (change > 0)
+                // OR if BEARISH prediction (score <= 50) resulted in negative/flat change (change <= 0)
+                const predictedBullish = storedData.predictedScore > 50;
+                const actualPositiveChange = actualChangePercent > 0;
+                
+                const isCorrect = (predictedBullish && actualPositiveChange) || (!predictedBullish && !actualPositiveChange);
+
+
+                // 4. Update Firestore
+                await updateDoc(docRef, {
+                    status: 'COMPLETED',
+                    actualPriceUsd: currentPrice,
+                    actualMarketCap: currentMarketCap,
+                    actualChangePercent: actualChangePercent,
+                    isCorrect: isCorrect,
+                });
+
+                displayMessage(`Outcome rechecked for ${storedData.symbol}. Change: ${actualChangePercent.toFixed(2)}%`, false);
+
+            } catch (e) {
+                console.error("Error during outcome check:", e);
+                displayMessage(`Failed to verify outcome: ${e.message}`, true);
+            }
+        }
+
+        // Add the rest of the existing helper functions (renderPairChart, runSafetyCheck, renderExternalLinks)
+        
+        /**
+         * Loads the DexScreener Chart Embed based on pair data.
+         */
+        function renderPairChart(pair) {
+            const chartContainer = document.getElementById('chartContainer');
+            chartContainer.innerHTML = ''; // Clear previous content
+
+            if (!pair.chainId || !pair.pairAddress) {
+                chartContainer.innerHTML = `<p class="p-6 text-center text-red-400">
+                    <i data-lucide="alert-triangle" class="w-6 h-6 mr-2 inline-block"></i>
+                    ERROR: MISSING CHAIN ID OR PAIR ADDRESS.
+                </p>`;
+                lucide.createIcons();
+                return;
+            }
+
+            const iframe = document.createElement('iframe');
+            iframe.src = `https://dexscreener.com/${pair.chainId}/${pair.pairAddress}?embed=1&theme=dark`;
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            iframe.style.borderRadius = '0.5rem';
+
+            chartContainer.appendChild(iframe);
+            chartContainer.classList.add('h-[500px]'); 
 
             lucide.createIcons();
         }
 
         /**
          * Runs a heuristic safety check based on tax and liquidity metrics.
-         * @param {object} pair 
          */
         function runSafetyCheck(pair) {
             const safetyResult = document.getElementById('safetyResult');
-            const safetyCheckSection = document.getElementById('safetyCheck');
-            safetyCheckSection.classList.remove('hidden');
 
             const buyTax = pair.pairContract?.buyTax || 0;
             const sellTax = pair.pairContract?.sellTax || 0;
             const liquidity = pair.liquidity?.usd || 0;
 
-            let score = 100; // Start with 100 (safest)
-            let riskLevel = 'Low';
+            let score = 100; 
+            let riskLevel = 'LOW';
             let warnings = [];
 
             // 1. High Tax Risk
             const combinedTax = buyTax + sellTax;
             if (combinedTax > 10) {
                 score -= 30;
-                warnings.push(`High combined tax (${combinedTax.toFixed(2)}%) suggests a higher risk of manipulative practices or exit fees.`);
+                warnings.push(`HIGH TAXES (${combinedTax.toFixed(2)}%): Check for potential buy/sell traps.`);
             } else if (combinedTax > 5) {
                 score -= 15;
-                warnings.push(`Moderate combined tax (${combinedTax.toFixed(2)}%) is noted. Be aware of fees.`);
+                warnings.push(`MODERATE TAXES (${combinedTax.toFixed(2)}%): May impact profitability for quick trades.`);
             }
 
             // 2. Liquidity Risk
             if (liquidity < 50000) {
                 score -= 40;
-                warnings.push(`Extremely low liquidity (${formatCurrency(liquidity)}) increases the risk of large price swings and potential 'rug pulls'.`);
+                warnings.push(`CRITICAL LIQUIDITY (${formatCurrency(liquidity)}): Very high rug-pull risk if not locked/burned.`);
             } else if (liquidity < 200000) {
                 score -= 15;
-                warnings.push(`Liquidity is low (${formatCurrency(liquidity)}). Slippage may be high for large trades.`);
+                warnings.push(`LOW LIQUIDITY (${formatCurrency(liquidity)}): Exercise caution with large buys/sells.`);
             }
 
             // Determine final risk level
@@ -603,34 +1180,34 @@
 
             let riskColorClass = '';
             if (score <= 40) {
-                riskLevel = 'High';
+                riskLevel = 'HIGH RISK';
                 riskColorClass = 'text-red-400 bg-red-900/50 border-red-700';
             } else if (score <= 75) {
-                riskLevel = 'Moderate';
+                riskLevel = 'MEDIUM RISK';
                 riskColorClass = 'text-yellow-400 bg-yellow-900/50 border-yellow-700';
             } else {
-                riskLevel = 'Low';
-                riskColorClass = 'text-green-400 bg-green-900/50 border-green-700';
+                riskLevel = 'LOW RISK';
+                riskColorClass = 'text-lime-400 bg-lime-900/50 border-lime-700';
             }
 
             const warningsList = warnings.length > 0 
-                ? `<ul class="list-disc list-inside mt-4 space-y-2 text-sm text-slate-300">
-                    ${warnings.map(w => `<li class="flex items-start"><i data-lucide="alert-triangle" class="w-4 h-4 mr-2 text-yellow-500 flex-shrink-0 mt-1"></i> ${w}</li>`).join('')}
+                ? `<ul class="list-disc list-inside mt-4 space-y-2 text-sm text-gray-300 font-medium">
+                    ${warnings.map(w => `<li class="flex items-start break-words"><i data-lucide="alert-triangle" class="w-5 h-5 mr-2 text-red-500 flex-shrink-0 mt-1"></i> ${w}</li>`).join('')}
                   </ul>`
-                : `<p class="text-green-400 flex items-center"><i data-lucide="check-circle" class="w-5 h-5 mr-2"></i> Initial checks show reasonable contract metrics (low taxes, adequate liquidity).</p>`;
+                : `<p class="text-lime-400 flex items-center font-bold text-base"><i data-lucide="check-circle" class="w-6 h-6 mr-2"></i> NO IMMEDIATE RISKS DETECTED.</p>`;
             
             const htmlContent = `
-                <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
-                    <p class="text-xl font-bold">Safety Score (Heuristic)</p>
+                <div class="flex items-center justify-between border-b border-gray-700 pb-3 mb-4">
+                    <p class="text-xl font-bold text-white">SAFETY SCORE</p>
                     <p class="text-4xl font-extrabold ${riskColorClass.split(' ')[0]}">${score.toFixed(0)}/100</p>
                 </div>
                 <div class="p-4 rounded-lg border ${riskColorClass.split(' ').slice(2).join(' ')}">
-                    <p class="text-lg font-bold flex items-center ${riskColorClass.split(' ')[0]}">
-                        <i data-lucide="shield-alert" class="w-5 h-5 mr-2"></i> Contract Risk Level: <span class="ml-2">${riskLevel}</span>
+                    <p class="text-xl font-extrabold flex items-center ${riskColorClass.split(' ')[0]}">
+                        <i data-lucide="fingerprint" class="w-6 h-6 mr-3"></i> CONTRACT RISK: <span class="ml-2">${riskLevel}</span>
                     </p>
                     ${warningsList}
                 </div>
-                <p class="text-xs text-slate-500 mt-4">Note: This is an automated assessment and does not check for ownership renouncement, minting, or external code vulnerabilities.</p>
+                <p class="text-xs text-gray-500 mt-4">This is an automated risk assessment. Do not rely solely on this metric.</p>
             `;
 
             safetyResult.innerHTML = htmlContent;
@@ -638,11 +1215,79 @@
         }
 
         /**
+         * Displays external links for further research.
+         */
+        function renderExternalLinks(pair) {
+            const container = document.getElementById('externalLinks');
+            const address = pair.baseToken.address;
+            const chainId = pair.chainId;
+            const website = pair.baseToken.website;
+
+            const links = [];
+
+            if (website) {
+                links.push({ icon: 'globe', title: 'OFFICIAL WEBSITE', href: website, color: 'text-[var(--primary-accent)]' });
+            }
+
+            const tokenSnifferLink = `https://tokensniffer.com/token/${address}`;
+            links.push({ icon: 'lock', title: 'TOKEN SNIFFER (RUG CHECK)', href: tokenSnifferLink, color: 'text-red-400' });
+
+            let explorerName = 'BLOCK EXPLORER';
+            let explorerUrl = `https://www.google.com/search?q=${chainId}+explorer+${address}`;
+
+            if (chainId === 'ethereum') {
+                explorerName = 'ETHERSCAN';
+                explorerUrl = `https://etherscan.io/token/${address}`;
+            } else if (chainId === 'bsc') {
+                explorerName = 'BSCSCAN';
+                explorerUrl = `https://bscscan.com/token/${address}`;
+            } else if (chainId === 'solana') {
+                explorerName = 'SOLSCAN';
+                explorerUrl = `https://solscan.io/token/${address}`;
+            }
+
+            links.push({ icon: 'file-search', title: explorerName, href: explorerUrl, color: 'text-sky-400' });
+
+            const dexToolsUrl = `https://www.dextools.io/app/${chainId}/pair/${pair.pairAddress}`;
+            links.push({ icon: 'tool', title: 'DEXTOOLS CHART', href: dexToolsUrl, color: 'text-indigo-400' });
+            
+            const dexscreenerUrl = `https://dexscreener.com/${pair.chainId}/${pair.pairAddress}`;
+            links.push({ icon: 'line-chart', title: 'DEXSCREENER PAGE', href: dexscreenerUrl, color: 'text-blue-400' });
+
+
+            if (links.length === 0) {
+                 container.innerHTML = `<p class="text-gray-500">NO EXTERNAL INFORMATION AVAILABLE.</p>`;
+                 return;
+            }
+
+            container.innerHTML = links.map(link => `
+                <a href="${link.href}" target="_blank" class="flex items-center p-3 bg-gray-700/50 rounded-md hover:bg-gray-700 transition transform hover:scale-[1.01] border border-gray-600 shadow-md">
+                    <i data-lucide="${link.icon}" class="w-5 h-5 mr-3 ${link.color} flex-shrink-0"></i>
+                    <span class="text-white font-semibold break-words">${link.title}</span>
+                    <i data-lucide="external-link" class="w-4 h-4 ml-auto text-gray-400"></i>
+                </a>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+
+        /**
          * Initialization on page load.
          */
         window.onload = function() {
+            // Start Firebase initialization
+            window.initializeFirebase();
+
             // Set default style for the 15m prediction button
-            document.querySelector('.interval-btn[data-interval="15m"]').click();
+            const defaultButton = document.querySelector('.interval-btn[data-interval="15m"]');
+            if (defaultButton) {
+                // Do not automatically click, let the search process handle the default click
+                // to avoid issues when no data is loaded.
+                defaultButton.classList.add('active'); 
+                defaultButton.classList.add('bg-blue-700/70', 'border-blue-500', 'text-white');
+                defaultButton.classList.remove('bg-gray-700/70', 'border-gray-600', 'text-gray-300');
+            }
             lucide.createIcons(); 
         };
 
