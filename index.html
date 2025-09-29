@@ -232,7 +232,7 @@
 
                 // Handle case where API returns success but no pairs are trending (pairs: null)
                 if (!data.pairs || data.pairs.length === 0) {
-                    trendingTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-yellow-500">Nincs jelenleg trendelő adat. Próbálja meg manuálisan beírni egy token címét.</td></tr>';
+                    trendingTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-yellow-500">Nincs jelenleg trendelő adat a DexScreener szerint. Próbálja meg manuálisan beírni egy token címét.</td></tr>';
                     return;
                 }
 
@@ -288,9 +288,9 @@
             let address = document.getElementById('tokenAddressInput').value.trim();
             const loadingIndicator = document.getElementById('loadingIndicator');
             
-            // NEW VALIDATION: Prevent API call with obviously invalid/pasted console content
-            if (!address || address.length < 10 || address.length > 100 || address.includes('\n')) {
-                displayMessage("Kérjük, adjon meg egy érvényes, rövid token címet (nincs szóköz, újsor vagy debug log).", true);
+            // VALIDATION: Prevent API call with obviously invalid/pasted console content
+            if (!address || address.length < 5 || address.length > 100 || address.includes('\n') || address.includes('DEBUG')) {
+                displayMessage("Kérjük, adjon meg egy érvényes token címet (pl. 0x...) vagy szimbólumot (pl. PEPE). Kerülje a hosszú debug logok beillesztését.", true);
                 return;
             }
 
