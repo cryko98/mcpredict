@@ -171,9 +171,6 @@
     </footer>
 
     <script>
-        // Global variables for Firebase and other dynamic data are typically needed for production, 
-        // but for a static GitHub Pages site, we rely on public APIs.
-
         const DEXSCREENER_BASE_URL = 'https://api.dexscreener.com/latest/dex/';
         let chart = null; // Lightweight Chart instance
 
@@ -205,7 +202,7 @@
                 ? 'mt-4 text-center p-3 rounded-lg bg-red-900/50 text-red-300 border border-red-700'
                 : 'mt-4 text-center p-3 rounded-lg bg-emerald-900/50 text-emerald-300 border border-emerald-700';
             errorDiv.classList.remove('hidden');
-            setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+            setTimeout(() => errorDiv.classList.add('hidden'), 7000); // Extended timeout for visibility
         }
 
         /**
@@ -214,15 +211,28 @@
         async function fetchTrendingCoins() {
             const trendingTableBody = document.getElementById('trendingTableBody');
             trendingTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-500">Loading top trending pairs...</td></tr>';
+            
+            console.log("DEBUG: Attempting to fetch trending coins from DexScreener...");
 
             try {
-                // Fetch top trending tokens based on volume/traffic
-                // Using 'pairs' endpoint to get a list of trending pairs
-                const response = await fetch(DEXSCREENER_BASE_URL + 'pairs/trending');
-                const data = await response.json();
+                // Correct API endpoint for trending tokens
+                const endpoint = DEXSCREENER_BASE_URL + 'tokens/trending';
+                console.log("DEBUG: Fetch URL (TRENDING, FIXED):", endpoint);
 
+                const response = await fetch(endpoint);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`DEBUG: HTTP Status ${response.status} received. Response body start: ${errorText.substring(0, 100)}...`);
+                    throw new Error(`HTTP hiba! Státusz: ${response.status}.`);
+                }
+
+                const data = await response.json();
+                console.log("DEBUG: Trending data received successfully.", data);
+
+                // Handle case where API returns success but no pairs are trending (pairs: null)
                 if (!data.pairs || data.pairs.length === 0) {
-                    trendingTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-yellow-500">No trending data available right now.</td></tr>';
+                    trendingTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-yellow-500">Nincs jelenleg trendelő adat. Próbálja meg manuálisan beírni egy token címét.</td></tr>';
                     return;
                 }
 
@@ -255,8 +265,9 @@
                 });
 
             } catch (error) {
-                console.error('Error fetching trending coins:', error);
-                trendingTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-red-400">Failed to load data. API issue.</td></tr>';
+                console.error('API Error: Failed to fetch trending coins:', error);
+                trendingTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-red-400">Hiba az adatok betöltésekor. Kérjük, ellenőrizze a konzolt (F12) a hálózati hibákért.</td></tr>';
+                displayMessage(`Hiba: Nem sikerült betölteni a trendeket. Lásd a konzolt: ${error.message}`, true);
             }
         }
 
@@ -274,28 +285,32 @@
          * Main search handler to fetch token data.
          */
         async function handleSearch() {
-            const address = document.getElementById('tokenAddressInput').value.trim();
+            let address = document.getElementById('tokenAddressInput').value.trim();
             const loadingIndicator = document.getElementById('loadingIndicator');
             
-            if (!address) {
-                displayMessage("Please enter a valid token address.", true);
+            // NEW VALIDATION: Prevent API call with obviously invalid/pasted console content
+            if (!address || address.length < 10 || address.length > 100 || address.includes('\n')) {
+                displayMessage("Kérjük, adjon meg egy érvényes, rövid token címet (nincs szóköz, újsor vagy debug log).", true);
                 return;
             }
-
-            // Basic Ethereum/EVM address format validation
-            if (!/^0x[a-fA-F0-9]{40}$/.test(address) && address.length < 50) { 
-                // DexScreener also supports symbols, so we allow non-address strings, 
-                // but if it looks like an address, validate it.
-            }
-
 
             loadingIndicator.classList.remove('hidden');
             document.getElementById('tokenDetails').classList.add('hidden');
             document.getElementById('errorMessage').classList.add('hidden');
+            
+            console.log(`DEBUG: Searching for token address/symbol: ${address}`);
 
             try {
-                // Fetch token data by address across all chains (DexScreener API)
-                const response = await fetch(`${DEXSCREENER_BASE_URL}tokens/${address}`);
+                const endpoint = `${DEXSCREENER_BASE_URL}tokens/${address}`;
+                console.log("DEBUG: Search Fetch URL:", endpoint);
+                
+                const response = await fetch(endpoint);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP hiba! Státusz: ${response.status}.`);
+                }
+
                 const data = await response.json();
 
                 if (!data.pairs || data.pairs.length === 0) {
@@ -321,10 +336,13 @@
                     btn.classList.remove('bg-emerald-700/50', 'border-emerald-600', 'text-white');
                     btn.classList.add('bg-gray-800', 'border-gray-700', 'text-gray-400');
                 });
+                
+                // Reset to 15m prediction after successful search
+                document.querySelector('.interval-btn[data-interval="15m"]').click();
 
 
             } catch (error) {
-                console.error('Search failed:', error);
+                console.error('API Error: Search failed:', error);
                 displayMessage(`Analysis failed: ${error.message}. Please check the token address/symbol.`, true);
             } finally {
                 loadingIndicator.classList.add('hidden');
@@ -338,7 +356,8 @@
         function renderTokenDetails(pair) {
             const price = pair.priceUsd ? parseFloat(pair.priceUsd) : 0;
             const priceChange24h = pair.priceChange.h24;
-            const marketCap = pair.fdv || pair.liquidity.usd * 5; // Use FDV or simple liquidity multiplier as placeholder
+            // Use FDV or simple liquidity multiplier as placeholder
+            const marketCap = pair.fdv || (pair.liquidity?.usd ? pair.liquidity.usd * 5 : 0); 
             
             document.getElementById('tokenSymbol').textContent = `${pair.baseToken.symbol}/${pair.quoteToken.symbol}`;
             document.getElementById('currentPrice').textContent = formatCurrency(price);
@@ -354,14 +373,7 @@
 
 
         /**
-         * Fetches and renders historical price data for the chart.
-         * NOTE: DexScreener does not provide an official historical data endpoint. 
-         * We will simulate candle data for demonstration purposes, or use the 
-         * simple price points if available, but for a real solution, a dedicated 
-         * chart API (like Kaiko or alternative) would be needed. 
-         * Since we cannot rely on external historical data APIs for a simple
-         * static page, we will SIMULATE a simple line chart trend based on 
-         * the 24H change.
+         * Fetches and renders historical price data for the chart. (Uses simulated data as DexScreener lacks public historical endpoint.)
          */
         async function fetchHistoricalData(pairAddress, chainId) {
             const chartContainer = document.getElementById('chartContainer');
@@ -392,24 +404,30 @@
                     secondsVisible: false,
                 },
             });
+            
+            // Validation for chart instance methods to prevent TypeError
+            if (!chart || typeof chart.addLineSeries !== 'function') {
+                console.error('Lightweight Charts Error: Chart object creation failed or addLineSeries is missing.');
+                displayMessage('Chart rendering failed: The charting library component is missing a required function. Check console for details.', true);
+                return;
+            }
 
-            // Create a simple line series for price tracking
             const lineSeries = chart.addLineSeries({
                 color: '#10b981', // Emerald
                 lineWidth: 2,
             });
             
             // --- SIMULATED DATA GENERATION ---
-            // In a real application, you'd fetch candlestick data. Here, we generate 
-            // 6 hours of simulated data points for demonstration.
             const now = Math.floor(Date.now() / 1000);
             const dataPoints = [];
-            const currentPrice = parseFloat(document.getElementById('currentPrice').textContent.replace(/[^0-9.-]+/g,""));
-            let price = currentPrice * (1 + (Math.random() - 0.5) * 0.05); // Start slightly offset
+            // Safely parse current price
+            const currentPriceText = document.getElementById('currentPrice').textContent;
+            const currentPrice = parseFloat(currentPriceText.replace(/[^0-9.-]+/g,"")) || 0.000001; 
+            let price = currentPrice * (1 + (Math.random() - 0.5) * 0.05); 
 
             for (let i = 59; i >= 0; i--) { // 60 data points (simulating 6 hours, 6-minute intervals)
                 const timestamp = now - (i * 6 * 60); // 6 minutes ago
-                price = price * (1 + (Math.random() - 0.5) * 0.02); // Small random walk
+                price = price * (1 + (Math.random() - 0.5) * 0.02); 
                 dataPoints.push({ time: timestamp, value: price });
             }
             
@@ -445,24 +463,21 @@
             const priceChange24h = parseFloat(document.getElementById('priceChange24h').textContent.replace('%', ''));
 
             // Simulation of recent velocity/volatility data based on the last 24h trend
-            const velocityScore = Math.random() * 10; // 0-10 score for recent velocity
-            let probability = 50 + (priceChange24h / 5); // Base probability on 24H trend
+            const velocityScore = Math.random() * 10; 
+            let probability = 50 + (priceChange24h / 5); 
 
-            // Adjust based on simulated velocity score
             if (velocityScore > 7) {
-                probability += 10; // High velocity, bullish
+                probability += 10; 
             } else if (velocityScore < 3) {
-                probability -= 10; // Low velocity, bearish
+                probability -= 10; 
             }
 
-            // Interval adjustment
             if (interval === '15m' || interval === '1h') {
-                probability += (Math.random() * 10 - 5); // Short term is highly random
+                probability += (Math.random() * 10 - 5); 
             } else if (interval === '1w') {
-                probability -= 5; // Longer term is more conservative
+                probability -= 5; 
             }
 
-            // Ensure probability is between 10 and 90
             probability = Math.max(10, Math.min(90, probability));
             
             let message = '';
