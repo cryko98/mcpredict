@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MemePulse: Decentralized Token Analytics V4</title>
+    <title>MemePulse: Decentralized Token Analytics V5</title>
     <!-- Load Tailwind CSS CDN for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Inter font for professional typography -->
@@ -89,6 +89,17 @@
                     <div id="predictionResult" class="text-center p-6 rounded-xl border-4 border-green-700/50 bg-slate-900 transition duration-300">
                         <p class="text-xl font-semibold mb-2 text-slate-400">Select a time interval for analysis.</p>
                     </div>
+
+                    <!-- Detailed Analysis Breakdown -->
+                    <div id="predictionDetails" class="mt-6">
+                        <h4 class="text-lg font-bold text-white border-b border-slate-700 pb-2 mb-3 flex items-center">
+                            <i data-lucide="file-text" class="w-4 h-4 mr-2 text-indigo-400"></i>
+                            Detailed Prediction Analysis
+                        </h4>
+                        <ul id="analysisList" class="space-y-2 text-sm text-slate-300">
+                            <li>Run an analysis to see the breakdown of factors affecting the score.</li>
+                        </ul>
+                    </div>
                 </div>
                 <div class="mt-6">
                     <p class="text-xs text-yellow-500 bg-yellow-900/30 p-2 rounded-lg border border-yellow-700">
@@ -168,7 +179,7 @@
                     <i data-lucide="trending-up" class="w-5 h-5 mr-2 text-green-400"></i>
                     Live Price Chart (TradingView)
                 </h3>
-                <div id="chartContainer" class="h-[500px] w-full bg-slate-900 rounded-xl overflow-hidden">
+                <div id="chartContainer" class="h-[500px] w-full bg-slate-900 rounded-xl overflow-hidden flex items-center justify-center">
                     <p class="p-6 text-center text-slate-500">Please search for a token to load the chart.</p>
                 </div>
             </div>
@@ -196,6 +207,8 @@
     <script>
         const DEXSCREENER_BASE_URL = 'https://api.dexscreener.com/latest/dex/';
         
+        let currentPairData = null; // Store the current pair data globally for prediction access
+
         /**
          * Helper function: Formats numbers as currency (USD).
          * @param {number} value 
@@ -208,7 +221,7 @@
                 currency: 'USD',
                 notation: 'compact',
                 compactDisplay: 'short',
-                maximumSignificantDigits: 6, // Show more precision for low-priced coins
+                maximumSignificantDigits: 6,
             }).format(value);
         }
 
@@ -239,8 +252,6 @@
             setTimeout(() => errorDiv.classList.add('hidden'), 7000);
         }
 
-        // --- Removed fetchTrendingCoins and autoSearch functions ---
-
         /**
          * Main search handler. Fetches token data.
          */
@@ -260,7 +271,6 @@
             document.getElementById('errorMessage').classList.add('hidden');
             
             try {
-                // Endpoint: /latest/dex/tokens/{address} (token-based search)
                 const endpoint = `${DEXSCREENER_BASE_URL}tokens/${address}`;
                 
                 const response = await fetch(endpoint);
@@ -282,9 +292,11 @@
                     throw new Error("Failed to retrieve pair data.");
                 }
 
+                currentPairData = pair; // Store the data globally
+                
                 renderTokenDetails(pair);
                 renderTradingViewChart(pair);
-                runSafetyCheck(pair); // Run the new safety check
+                runSafetyCheck(pair); // Run the safety check
 
                 document.getElementById('tokenDetails').classList.remove('hidden');
                 
@@ -325,24 +337,39 @@
             priceChangeElement.className = priceChange24h >= 0 ? 'text-green-400 font-bold text-lg' : 'text-red-400 font-bold text-lg';
 
             // Transaction Data
-            document.getElementById('txns24h').textContent = formatNumber(pair.txns?.h24?.buys + pair.txns?.h24?.sells) || 'N/A';
+            document.getElementById('txns24h').textContent = formatNumber((pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0)) || 'N/A';
             document.getElementById('flippers5m').textContent = `${formatNumber(pair.txns?.m5?.buys || 0)} B / ${formatNumber(pair.txns?.m5?.sells || 0)} S`;
-            document.getElementById('buyTax').textContent = `${pair.pairContract?.buyTax?.toFixed(2) || '0.00'}%`;
-            document.getElementById('sellTax').textContent = `${pair.pairContract?.sellTax?.toFixed(2) || '0.00'}%`;
+            document.getElementById('buyTax').textContent = `${(pair.pairContract?.buyTax || 0).toFixed(2)}%`;
+            document.getElementById('sellTax').textContent = `${(pair.pairContract?.sellTax || 0).toFixed(2)}%`;
         }
 
         /**
          * Loads the TradingView Widget based on DexScreener pair data.
+         * FIX: Handles symbol conversion for better TradingView compatibility.
          * @param {object} pair 
          */
         function renderTradingViewChart(pair) {
             const chartContainer = document.getElementById('chartContainer');
             chartContainer.innerHTML = ''; // Clear previous content
 
-            // Construct TradingView symbol (e.g., PEPEUSDT)
-            const quoteSymbol = pair.quoteToken.symbol === 'WETH' ? 'ETH' : pair.quoteToken.symbol;
-            let tradingSymbol = `${pair.baseToken.symbol}${quoteSymbol}`;
+            // Attempt to create a standard TradingView symbol. 
+            // This is the common failure point for new DEX coins.
+            const baseSymbol = pair.baseToken.symbol;
+            let quoteSymbol = pair.quoteToken.symbol; 
             
+            // Common conversions for centralized exchange symbols
+            if (quoteSymbol === 'WETH' || quoteSymbol === 'ETH') quoteSymbol = 'USDT';
+            if (quoteSymbol === 'WBNB' || quoteSymbol === 'BNB') quoteSymbol = 'USDT';
+            if (quoteSymbol === 'USDC' || quoteSymbol === 'DAI') quoteSymbol = 'USDT';
+            
+            // Try major exchange (BINANCE) symbol mapping as a common fallback
+            let tradingSymbol = `BINANCE:${baseSymbol}${quoteSymbol}`; 
+            
+            // If the quote token is still not a major one, default to a general DEX symbol
+            if (quoteSymbol !== 'USDT') {
+                 tradingSymbol = `${baseSymbol}USD`;
+            }
+
             // TradingView widget integration
             const script = document.createElement('script');
             script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
@@ -350,12 +377,12 @@
             script.innerHTML = JSON.stringify({
                 "width": "100%",
                 "height": "100%",
-                "symbol": tradingSymbol, // e.g., 'PEPEUSDT'
+                "symbol": tradingSymbol,
                 "interval": "60", // 1-hour candles
                 "timezone": "Europe/Budapest",
                 "theme": "dark",
                 "style": "1",
-                "locale": "en", // English interface
+                "locale": "en", 
                 "allow_symbol_change": true,
                 "save_image": false,
                 "container_id": "chartContainer",
@@ -364,22 +391,35 @@
             });
             chartContainer.appendChild(script);
 
-             // Add a warning if the chart doesn't load
-             setTimeout(() => {
-                if (chartContainer.querySelector('iframe')) {
-                    console.log("DEBUG: TradingView chart loaded.");
-                } else {
-                    chartContainer.innerHTML = `<p class="p-6 text-center text-red-400">WARNING: TradingView could not find the pair ${tradingSymbol}. It may be a too new/low-cap token. Please try a different token symbol or address!</p>`;
+             // Add a fallback message if the chart doesn't load
+             const fallbackTimeout = setTimeout(() => {
+                const iframe = chartContainer.querySelector('iframe');
+                if (!iframe || iframe.src.indexOf('error') !== -1) {
+                    chartContainer.innerHTML = `
+                        <p class="p-6 text-center text-red-400">
+                            <i data-lucide="alert-triangle" class="w-6 h-6 mr-2 inline-block"></i>
+                            WARNING: TradingView could not load the chart for symbol ${tradingSymbol}. 
+                            This often happens with very new or low-cap DEX tokens. The data below is still live, but the chart is unavailable.
+                        </p>
+                    `;
+                    lucide.createIcons();
                 }
             }, 3000);
         }
 
         
         /**
-         * Runs the experimental prediction (Heuristic Model).
+         * Runs the experimental prediction (Advanced Heuristic Model).
          * @param {string} interval 
          */
         function runPrediction(interval) {
+            if (!currentPairData) {
+                document.getElementById('predictionResult').innerHTML = `<p class="text-xl font-semibold mb-2 text-slate-400">Run an analysis first!</p>`;
+                return;
+            }
+            
+            const pair = currentPairData;
+
             // Update button styles
             document.querySelectorAll('.interval-btn').forEach(btn => {
                 btn.classList.remove('bg-green-700/50', 'border-green-600', 'text-white');
@@ -389,59 +429,108 @@
             activeBtn.classList.add('bg-green-700/50', 'border-green-600', 'text-white');
             activeBtn.classList.remove('bg-slate-700', 'border-slate-600', 'text-slate-300');
 
-            // Retrieve displayed data
-            const predictionResult = document.getElementById('predictionResult');
-            const priceChange24h = parseFloat(document.getElementById('priceChange24h').textContent.replace('%', '')) || 0;
-            const txns24hText = document.getElementById('txns24h').textContent.replace(/[^0-9.-]+/g,"");
-            const txns24h = parseFloat(txns24hText) || 0;
-            const volume24hText = document.getElementById('volume24h').textContent.replace(/[^0-9.-]+/g,"");
-            const volume24h = parseFloat(volume24hText) || 0;
+            // --- DATA EXTRACTION ---
+            const priceChange24h = pair.priceChange?.h24 || 0;
+            const txns24h = (pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0);
+            const volume24h = pair.volume?.h24 || 0;
+            const liquidity = pair.liquidity?.usd || 0;
+            const marketCap = pair.fdv || (liquidity * 5);
+            const buyTax = pair.pairContract?.buyTax || 0;
+            const sellTax = pair.pairContract?.sellTax || 0;
 
+            // --- PREDICITION MODEL & SCORING ---
+            let score = 50; // Neutral start score
+            let analysisNotes = [];
 
-            // Calculate experimental probability
-            // Base: 24h change and transaction activity
-            let baseProbability = 50 + (priceChange24h / 5); 
+            // 1. MOMENTUM (Weight 40%) - Based on 24H Price Change
+            let momentumContribution = 0;
+            if (priceChange24h >= 10) {
+                momentumContribution = Math.min(20, priceChange24h * 0.5); // Max +20
+                analysisNotes.push({type: 'up', text: `Strong Momentum: 24H price is up by ${priceChange24h.toFixed(2)}%.`});
+            } else if (priceChange24h > 0) {
+                momentumContribution = Math.min(10, priceChange24h * 0.5); // Max +10
+                analysisNotes.push({type: 'up', text: `Positive Momentum: Price is in an upward trend over 24H.`});
+            } else if (priceChange24h <= -10) {
+                momentumContribution = Math.max(-15, priceChange24h * 0.5); // Max -15
+                analysisNotes.push({type: 'down', text: `Negative Momentum: 24H price is down by ${Math.abs(priceChange24h).toFixed(2)}%.`});
+            }
+            score += momentumContribution;
+
+            // 2. MARKET ACTIVITY (Weight 30%) - Based on 24H Transactions & Volume/Cap ratio
+            let activityContribution = 0;
+            const volumeToCapRatio = marketCap > 0 ? volume24h / marketCap : 0;
             
-            // Interval adjustment
-            let intervalMultiplier = 1;
-            if (interval === '15m') intervalMultiplier = 1.2;
-            else if (interval === '1h') intervalMultiplier = 1.1;
-            else if (interval === '1d') intervalMultiplier = 0.9;
-            else if (interval === '1w') intervalMultiplier = 0.8;
+            if (txns24h >= 10000) {
+                activityContribution += 10;
+                analysisNotes.push({type: 'up', text: `High Activity: ${formatNumber(txns24h)} transactions, indicating strong community interest.`});
+            } else if (txns24h >= 2000) {
+                activityContribution += 5;
+                analysisNotes.push({type: 'up', text: `Moderate Activity: Healthy transaction volume over 24H.`});
+            }
 
-            // Add velocity factor (based on Transaction/Volume ratio)
-            const velocity = (txns24h > 1000 && volume24h > 100000) ? (txns24h / volume24h) * 1000 : 0;
-            baseProbability += Math.min(10, velocity * 0.1);
+            if (volumeToCapRatio >= 0.5) { // If Volume is half the Market Cap, very volatile/high interest
+                activityContribution += 5;
+                analysisNotes.push({type: 'up', text: `Extreme Volatility: Volume/Cap ratio of ${(volumeToCapRatio * 100).toFixed(0)}% suggests high trading interest.`});
+            }
+            score += activityContribution;
 
-            let probability = baseProbability * intervalMultiplier;
 
-            // Clamp probability between 10% and 90%
-            probability = Math.max(10, Math.min(90, probability));
+            // 3. SAFETY/STABILITY (Weight 30%) - Based on Liquidity and Taxes
+            let safetyContribution = 0;
+            
+            if (liquidity >= 500000) {
+                safetyContribution += 10;
+                analysisNotes.push({type: 'up', text: `High Liquidity: ${formatCurrency(liquidity)} USD provides stability and low slippage.`});
+            } else if (liquidity < 100000) {
+                safetyContribution -= 15;
+                analysisNotes.push({type: 'down', text: `Low Liquidity: ${formatCurrency(liquidity)} USD introduces high volatility risk.`});
+            }
+
+            const combinedTax = buyTax + sellTax;
+            if (combinedTax > 15) {
+                safetyContribution -= 10;
+                analysisNotes.push({type: 'down', text: `High Taxes: Combined tax of ${combinedTax.toFixed(2)}% discourages holding and trading.`});
+            } else if (combinedTax < 5) {
+                safetyContribution += 5;
+                analysisNotes.push({type: 'up', text: `Low Taxes: Attractive tax structure (${combinedTax.toFixed(2)}%) for traders.`});
+            }
+            score += safetyContribution;
+
+
+            // --- INTERVAL ADJUSTMENT (Small multiplier based on requested time horizon) ---
+            let finalScore = score;
+            if (interval === '15m') finalScore = score * 1.05;
+            else if (interval === '1h') finalScore = score * 1.02;
+            else if (interval === '1w') finalScore = score * 0.95; 
+
+            // Clamp probability between 5% and 95%
+            finalScore = Math.max(5, Math.min(95, finalScore));
+            const probability = finalScore;
             const fallProbability = 100 - probability;
             
             let message = '';
             let colorClass = '';
-            let recommendation = '';
+            let riskLevel = 'Neutral';
 
-            if (probability >= 75) {
-                // Strong bullish signal
+            if (probability >= 70) {
                 message = `High Probability for **Market Cap Growth**!`;
                 colorClass = 'border-green-500 bg-green-900/50';
-                recommendation = `<p class="text-xl font-bold text-green-300 mt-4 border-t border-green-700 pt-3 flex items-center justify-center"><i data-lucide="check-check" class="w-5 h-5 mr-2"></i> RECOMMENDED BUY</p>`;
+                riskLevel = 'Bullish (Strong)';
             } else if (probability >= 60) {
-                // Moderate bullish signal
                 message = `Moderate chance for **Market Cap Growth**.`;
                 colorClass = 'border-lime-500 bg-lime-900/50';
+                riskLevel = 'Bullish (Moderate)';
             } else if (probability <= 40) {
-                // Bearish signal
                 message = `**Market Cap Decline** is likely!`;
                 colorClass = 'border-red-500 bg-red-900/50';
+                riskLevel = 'Bearish';
             } else {
-                // Consolidation
                 message = `**Consolidation / High Volatility** expected.`;
                 colorClass = 'border-yellow-500 bg-yellow-900/50';
+                riskLevel = 'Sideways';
             }
 
+            // --- RENDER RESULTS ---
             const formattedMessage = `
                 <div class="flex justify-around items-center space-x-4 mb-3">
                     <div class="text-center">
@@ -454,13 +543,23 @@
                     </div>
                 </div>
                 <p class="text-lg font-semibold text-white">${message}</p>
-                <p class="text-sm text-slate-400 mt-2">Prediction for the next ${interval.toUpperCase()} interval.</p>
-                ${recommendation}
+                <p class="text-sm text-slate-400 mt-2">Prediction for the next ${interval.toUpperCase()} interval. **Risk Level: ${riskLevel}**</p>
             `;
 
             predictionResult.innerHTML = formattedMessage;
             predictionResult.className = `text-center p-6 rounded-xl border-4 ${colorClass} transition duration-300`;
-            lucide.createIcons(); // Re-render icons after updating prediction
+
+            // RENDER ANALYSIS NOTES
+            const analysisList = document.getElementById('analysisList');
+            analysisList.innerHTML = analysisNotes.map(note => {
+                const icon = note.type === 'up' 
+                    ? `<i data-lucide="chevron-up" class="w-4 h-4 mr-2 text-green-400 flex-shrink-0 mt-1"></i>` 
+                    : `<i data-lucide="chevron-down" class="w-4 h-4 mr-2 text-red-400 flex-shrink-0 mt-1"></i>`;
+                return `<li class="flex items-start">${icon}${note.text}</li>`;
+            }).join('');
+
+
+            lucide.createIcons();
         }
 
         /**
@@ -544,9 +643,7 @@
         window.onload = function() {
             // Set default style for the 15m prediction button
             document.querySelector('.interval-btn[data-interval="15m"]').click();
-            lucide.createIcons(); // Ensure initial icons are rendered
-            
-            // Note: fetchTrendingCoins has been removed.
+            lucide.createIcons(); 
         };
 
     </script>
